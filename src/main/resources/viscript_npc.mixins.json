@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.viscript.npc.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "refmap": "viscript_npc.refmap.json",
+  "mixins": [
+    "LivingEntityMixin"
+  ],
+  "client": [
+    "LivingEntityRenderMixin",
+    "aw.LivingEntityRendererAwMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
