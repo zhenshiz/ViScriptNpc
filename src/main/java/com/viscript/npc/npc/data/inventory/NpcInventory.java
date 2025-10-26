@@ -19,12 +19,15 @@ import io.netty.buffer.ByteBuf;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.item.Items;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -32,24 +35,26 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class NpcInventory implements IConfigurable, IPersistedSerializable {
     public static final StreamCodec<ByteBuf, NpcInventory> STREAM_CODEC;
     public static final Codec<NpcInventory> CODEC;
     @Persisted
-    private String helmet;
+    private String helmet = Items.AIR.toString();
     @Persisted
-    private String chestplate;
+    private String chestplate = Items.AIR.toString();
     @Persisted
-    private String leggings;
+    private String leggings = Items.AIR.toString();
     @Persisted
-    private String boots;
+    private String boots = Items.AIR.toString();
     @Persisted
-    private String mainHand;
+    private String mainHand = Items.AIR.toString();
     @Persisted
-    private String offHand;
+    private String offHand = Items.AIR.toString();
     @Configurable(name = "npcConfig.npcInventory.levelRange")
-    @ConfigNumber(range = {0, Integer.MAX_VALUE}, type = Type.FLOAT)
-    private Range levelConfig = Range.of(0, 0);
+    @ConfigNumber(range = {0, Integer.MAX_VALUE}, type = Type.INTEGER)
+    private Range levelRange = Range.of(0, 0);
     @Configurable(name = "npcConfig.npcInventory.lootTableType")
     @ConfigSelector(subConfiguratorBuilder = "LootTableTypeSubConfiguratorBuilder")
     private LootTableType lootTableType = LootTableType.CUSTOM;
@@ -65,10 +70,10 @@ public class NpcInventory implements IConfigurable, IPersistedSerializable {
 
     @Override
     public void buildConfigurator(ConfiguratorGroup father) {
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.helmet", this::getHelmet, this::setHelmet));
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.chestplate", this::getChestplate, this::setChestplate));
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.leggings", this::getLeggings, this::setLeggings));
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.boots", this::getBoots, this::setBoots));
+        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.helmet", this::getHelmet, this::setHelmet, ItemTags.HEAD_ARMOR));
+        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.chestplate", this::getChestplate, this::setChestplate, ItemTags.CHEST_ARMOR));
+        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.leggings", this::getLeggings, this::setLeggings, ItemTags.LEG_ARMOR));
+        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.boots", this::getBoots, this::setBoots, ItemTags.FOOT_ARMOR));
         father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.mainHand", this::getMainHand, this::setMainHand));
         father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.offHand", this::getOffHand, this::setOffHand));
         IConfigurable.super.buildConfigurator(father);
@@ -84,12 +89,17 @@ public class NpcInventory implements IConfigurable, IPersistedSerializable {
                 );
             }
             case CUSTOM -> {
-                ArrayConfiguratorGroup<LootTableConfig> lootTableConfigArrayConfiguratorGroup = new ArrayConfiguratorGroup<>("npcConfig.npcInventory.lootTables", true, this::getLootTables,
+                ArrayConfiguratorGroup<LootTableConfig> lootTableConfigArrayConfiguratorGroup = new ArrayConfiguratorGroup<>("npcConfig.npcInventory.lootTables", false, this::getLootTables,
                         (getter, setter) -> {
                             LootTableConfig instance = getter.get();
                             return instance != null ? instance.createDirectConfigurator() : new Configurator();
-                        }, false);
+                        }, true);
                 lootTableConfigArrayConfiguratorGroup.setAddDefault(LootTableConfig::new);
+                lootTableConfigArrayConfiguratorGroup.setOnUpdate(list -> {
+                    List<LootTableConfig> origin = this.getLootTables();
+                    origin.clear();
+                    origin.addAll(list);
+                });
                 group.addConfigurator(lootTableConfigArrayConfiguratorGroup);
             }
         }

@@ -1,16 +1,19 @@
 package com.viscript.npc.npc;
 
 import com.lowdragmc.lowdraglib2.Platform;
+import com.lowdragmc.lowdraglib2.math.Range;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.event.NpcEvent;
-import com.viscript.npc.npc.ai.goal.NpcAttackGoal;
 import com.viscript.npc.npc.ai.mind.MindMachine;
+import com.viscript.npc.npc.ai.mind.api.IntentionPriority;
+import com.viscript.npc.npc.ai.mind.intention.MeleeAttackIntention;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
 import com.viscript.npc.npc.data.attributes.ResistanceConfig;
 import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
 import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
+import com.viscript.npc.npc.data.inventory.LootTableConfig;
 import com.viscript.npc.npc.data.inventory.NpcInventory;
 import com.viscript.npc.npc.data.mod.integrations.ChatBoxConfig;
 import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
@@ -18,11 +21,18 @@ import com.viscript.npc.util.common.StrUtil;
 import com.zhenshiz.chatbox.utils.chatbox.ChatBoxCommandUtil;
 import lombok.Getter;
 import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
@@ -32,14 +42,18 @@ import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.goal.target.NearestAttackableTargetGoal;
 import net.minecraft.world.entity.monster.RangedAttackMob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -48,10 +62,7 @@ import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
-import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
-import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+import net.neoforged.neoforge.event.entity.living.*;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -78,9 +89,6 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     // MindMachine
     @Getter
     MindMachine mind;
-
-    private int targetSelectorCount = 1;
-    private int goalSelectorCount = 1;
 
     public CustomNpc(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
@@ -244,13 +252,7 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
         this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS, npcAttributes.getDefenseConfig().getArmorToughness());
 
         //AI
-        this.goalSelectorCount = 1;
-        this.targetSelectorCount = 1;
-        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, Player.class, true));
-        this.goalSelector.addGoal(1, new NpcAttackGoal(this, npcAttributes.getMovementSpeed(), true));
 
-        //物品栏
-        NpcInventory npcInventory = getNpcInventory();
 
         //联动模组
         NpcModIntegrations npcModIntegrations = getNpcModIntegrations();
@@ -268,6 +270,58 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
         }
 
         return InteractionResult.PASS;
+    }
+
+    @Override
+    protected void dropCustomDeathLoot(ServerLevel level, DamageSource damageSource, boolean recentlyHit) {
+        NpcInventory npcInventory = this.getNpcInventory();
+        switch (npcInventory.getLootTableType()) {
+            case DATAPACK -> {
+                ResourceLocation lootTableRes = ResourceLocation.parse(npcInventory.getLootTable());
+                ResourceKey<LootTable> resourcekey = ResourceKey.create(Registries.LOOT_TABLE, lootTableRes);
+                LootTable loottable = this.level().getServer().reloadableRegistries().getLootTable(resourcekey);
+                LootParams.Builder lootparams$builder = new LootParams.Builder((ServerLevel) this.level())
+                        .withParameter(LootContextParams.THIS_ENTITY, this)
+                        .withParameter(LootContextParams.ORIGIN, this.position())
+                        .withParameter(LootContextParams.DAMAGE_SOURCE, damageSource)
+                        .withOptionalParameter(LootContextParams.ATTACKING_ENTITY, damageSource.getEntity())
+                        .withOptionalParameter(LootContextParams.DIRECT_ATTACKING_ENTITY, damageSource.getDirectEntity());
+                if (recentlyHit && this.lastHurtByPlayer != null) {
+                    lootparams$builder = lootparams$builder.withParameter(LootContextParams.LAST_DAMAGE_PLAYER, this.lastHurtByPlayer)
+                            .withLuck(this.lastHurtByPlayer.getLuck());
+                }
+
+                LootParams lootparams = lootparams$builder.create(LootContextParamSets.ENTITY);
+                loottable.getRandomItems(lootparams, this.getLootTableSeed(), this::spawnAtLocation);
+            }
+            case CUSTOM -> {
+                for (LootTableConfig lootTableConfig : npcInventory.getLootTables()) {
+                    ResourceLocation key = ResourceLocation.parse(lootTableConfig.getItem());
+                    Item item = BuiltInRegistries.ITEM.get(key);
+
+                    if (item == Items.AIR) continue;
+
+                    float chance = lootTableConfig.getChance();
+                    int count = lootTableConfig.getCount();
+
+                    // 随机概率判断是否掉落
+                    float v = random.nextFloat();
+                    System.out.println(v);
+                    System.out.println(chance);
+                    if (v <= chance) {
+                        ItemStack stack = new ItemStack(item, count);
+                        System.out.println(stack);
+
+                        if (!lootTableConfig.getName().isEmpty()) {
+                            stack.set(DataComponents.ITEM_NAME, Component.translatable(lootTableConfig.getName()));
+                        }
+
+                        // 将物品作为掉落物生成出来
+                        this.spawnAtLocation(stack);
+                    }
+                }
+            }
+        }
     }
 
     @Override
@@ -364,6 +418,10 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
         this.xCloak += d0 * 0.25;
         this.zCloak += d2 * 0.25;
         this.yCloak += d1 * 0.25;
+    }
+
+    protected void dropFromLootTable(DamageSource damageSourceIn, boolean attackedRecently) {
+        //取消npc自带的战利品系统
     }
 
     private void attack(CustomNpc npc, LivingEntity entity) {
@@ -463,6 +521,15 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.TargetEvent(npc, event)).isCanceled()) {
                     event.setCanceled(true);
                 }
+            }
+        }
+
+        @SubscribeEvent
+        public static void onXpDrop(LivingExperienceDropEvent event) {
+            if (event.getEntity() instanceof CustomNpc npc) {
+                Range levelConfig = npc.getNpcInventory().getLevelRange();
+                int random = Mth.randomBetweenInclusive(RandomSource.create(), levelConfig.getMin().intValue(), levelConfig.getMax().intValue());
+                event.setDroppedExperience(random);
             }
         }
     }

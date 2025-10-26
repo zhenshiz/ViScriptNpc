@@ -3,9 +3,9 @@ package com.viscript.npc.npc.layer;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
+import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.render.CustomNpcRender;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -37,7 +37,7 @@ public class CapeLayer<T extends CustomNpc, M extends HumanoidModel<T>> extends 
             String ct = livingEntity.getNpcBasicsSetting().getCapeTexture();
             if (ct.isEmpty()) return;
             ResourceLocation capeTexture = ResourceLocation.parse(ct);
-            if (Minecraft.getInstance().getResourceManager().getResource(capeTexture).isPresent()) {
+            if (ViScriptNpc.isPresentResource(capeTexture)) {
                 ItemStack itemstack = livingEntity.getItemBySlot(EquipmentSlot.CHEST);
                 if (!itemstack.is(Items.ELYTRA)) {
                     poseStack.pushPose();

@@ -51,7 +51,7 @@ public class NPCPreviewView extends View {
     private final CustomNpc customNpc;
     private int sceneRange = 10;
     @Setter
-    private boolean cullBoxVisible = true;
+    private boolean cullBoxVisible = false;
 
     //runtime
     private boolean isSceneLoaded = false;

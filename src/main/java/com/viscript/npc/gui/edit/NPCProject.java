@@ -48,7 +48,7 @@ public class NPCProject implements IProject {
 
     @Override
     public String getVersion() {
-        return "%d.0".formatted(VERSION) ;
+        return "%d.0".formatted(VERSION);
     }
 
     @Override
@@ -99,7 +99,8 @@ public class NPCProject implements IProject {
                                                 var fileData = npc.serializeNBT(Platform.getFrozenRegistry());
                                                 NbtIo.writeCompressed(fileData, file.toPath());
                                                 NpcHelper.clearCache();
-                                            } catch (Exception ignored) {}
+                                            } catch (Exception ignored) {
+                                            }
                                         }
                                     }).show(editor);
                         })

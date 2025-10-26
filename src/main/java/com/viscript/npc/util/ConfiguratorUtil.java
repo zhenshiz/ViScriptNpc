@@ -8,6 +8,7 @@ import com.viscript.npc.util.common.BeanUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 
@@ -19,7 +20,7 @@ import java.util.function.Supplier;
  * 预设的配置组件
  */
 public class ConfiguratorUtil {
-    public static SearchComponentConfigurator<Item> createItemSearchComponentConfigurator(String name, Supplier<String> getter, Consumer<String> setter) {
+    public static SearchComponentConfigurator<Item> createItemSearchComponentConfigurator(String name, Supplier<String> getter, Consumer<String> setter, TagKey<Item> tag) {
         SearchComponentConfigurator<Item> itemSearchComponentConfigurator = new SearchComponentConfigurator<>(name,
                 () -> {
                     String id = getter.get();
@@ -38,6 +39,7 @@ public class ConfiguratorUtil {
                     for (var key : BuiltInRegistries.ITEM.keySet()) {
                         if (Thread.currentThread().isInterrupted()) return;
                         Item item = BuiltInRegistries.ITEM.get(key);
+                        if (tag != null && !item.getDefaultInstance().is(tag)) continue;
                         if (key.toString().toLowerCase().contains(lowerWord) || Component.translatable(item.getDescriptionId()).getString().toLowerCase().contains(lowerWord)) {
                             ((IResultHandler<Item>) searchHandler).acceptResult(BuiltInRegistries.ITEM.get(key));
                         }
@@ -51,6 +53,10 @@ public class ConfiguratorUtil {
                 item -> Component.translatable(item.getDescriptionId())
         ));
         return itemSearchComponentConfigurator;
+    }
+
+    public static SearchComponentConfigurator<Item> createItemSearchComponentConfigurator(String name, Supplier<String> getter, Consumer<String> setter) {
+        return createItemSearchComponentConfigurator(name, getter, setter, null);
     }
 
     public static SearchComponentConfigurator<String> createStrArrSearchComponentConfigurator(String name, Set<String> strArr, Supplier<String> getter, Consumer<String> setter) {

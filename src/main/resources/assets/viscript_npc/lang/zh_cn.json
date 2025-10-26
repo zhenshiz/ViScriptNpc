@@ -87,7 +87,7 @@
   "npcConfig.npcAttributes.outOfCombatRegenRate": "脱战回血",
   "npcConfig.npcAttributes.regenRate.tips": "每秒的回血量",
 
-  "npcConfig.npcInventory": "Npc物品栏",
+  "npcConfig.npcInventory": "NPC物品栏",
   "npcConfig.npcInventory.offHand": "副手",
   "npcConfig.npcInventory.mainHand": "主手",
   "npcConfig.npcInventory.helmet": "头盔",
@@ -101,6 +101,7 @@
   "npcConfig.npcInventory.lootTable": "数据包战利品配置",
   "npcConfig.npcInventory.lootTables": "自定义战利品表配置",
   "npcConfig.npcInventory.LootTableConfig.item": "物品ID",
+  "npcConfig.npcInventory.LootTableConfig.name": "物品名称",
   "npcConfig.npcInventory.LootTableConfig.count": "物品数量",
   "npcConfig.npcInventory.LootTableConfig.chance": "物品掉落概率",
 

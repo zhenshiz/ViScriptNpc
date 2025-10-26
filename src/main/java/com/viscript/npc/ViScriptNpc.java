@@ -7,6 +7,7 @@ import com.viscript.npc.command.ICommand;
 import com.viscript.npc.command.argument.ArgumentRegister;
 import com.viscript.npc.npc.NpcAttachmentType;
 import com.viscript.npc.npc.NpcRegister;
+import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -46,7 +47,11 @@ public class ViScriptNpc {
         return path.formatted(MOD_ID);
     }
 
-    public static boolean isChatBoxLoaded(){
+    public static boolean isPresentResource(ResourceLocation resourceLocation) {
+        return Minecraft.getInstance().getResourceManager().getResource(resourceLocation).isPresent();
+    }
+
+    public static boolean isChatBoxLoaded() {
         return isModLoaded("chatbox");
     }
 

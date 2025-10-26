@@ -7,10 +7,13 @@ import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
 import com.lowdragmc.lowdraglib2.utils.PersistedParser;
 import com.mojang.serialization.Codec;
+import com.viscript.npc.gui.edit.data.NpcConfig;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.util.common.BeanUtil;
 import io.netty.buffer.ByteBuf;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -25,6 +28,8 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.AABB;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class NpcDynamicModel implements IConfigurable, IPersistedSerializable {
     public static final StreamCodec<ByteBuf, NpcDynamicModel> STREAM_CODEC;
     public static final Codec<NpcDynamicModel> CODEC;

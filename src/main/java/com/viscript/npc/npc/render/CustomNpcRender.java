@@ -8,8 +8,10 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.viscript.npc.mixin.aw.LivingEntityRendererAwMixin;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
+import com.viscript.npc.npc.layer.ArmorLayer;
 import com.viscript.npc.npc.layer.CapeLayer;
 import com.viscript.npc.npc.layer.INpcAppearancePart;
+import com.viscript.npc.npc.layer.ItemInHandLayer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.model.EntityModel;
@@ -65,6 +67,12 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
         this.npcModel = model;
         this.npcLayers.addAll(this.layers);
         this.npcLayers.add(new CapeLayer<>(this));
+        this.npcLayers.add(new ItemInHandLayer<>(this, context.getItemInHandRenderer()));
+        this.npcLayers.add(new ArmorLayer<>(this,
+                new HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER_INNER_ARMOR)),
+                new HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR)),
+                context.getModelManager()
+        ));
         this.layers.clear();
         this.layers.addAll(this.npcLayers);
         this.renderModel = new HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER)) {

@@ -36,7 +36,6 @@ import org.jetbrains.annotations.NotNull;
 public class NpcBasicsSetting implements IConfigurable, IPersistedSerializable {
     public static final StreamCodec<ByteBuf, NpcBasicsSetting> STREAM_CODEC;
     public static final Codec<NpcBasicsSetting> CODEC;
-
     @Configurable(name = "npcConfig.npcBasicsSetting.customName")
     private String customName = "ViScript NPC";
     @Configurable(name = "npcConfig.npcBasicsSetting.customSubName")

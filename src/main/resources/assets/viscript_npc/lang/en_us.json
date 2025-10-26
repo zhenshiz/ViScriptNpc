@@ -93,6 +93,7 @@
   "npcConfig.npcInventory.lootTable": "数据包战利品配置",
   "npcConfig.npcInventory.lootTables": "自定义战利品表配置",
   "npcConfig.npcInventory.LootTableConfig.item": "物品ID",
+  "npcConfig.npcInventory.LootTableConfig.name": "",
   "npcConfig.npcInventory.LootTableConfig.count": "物品数量",
   "npcConfig.npcInventory.LootTableConfig.chance": "物品掉落概率",
 
