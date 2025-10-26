@@ -6,8 +6,6 @@ import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.event.NpcEvent;
 import com.viscript.npc.npc.ai.mind.MindMachine;
-import com.viscript.npc.npc.ai.mind.api.IntentionPriority;
-import com.viscript.npc.npc.ai.mind.intention.MeleeAttackIntention;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
 import com.viscript.npc.npc.data.attributes.ResistanceConfig;

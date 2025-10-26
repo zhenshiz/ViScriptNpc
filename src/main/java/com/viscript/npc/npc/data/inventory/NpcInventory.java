@@ -12,6 +12,7 @@ import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.math.Range;
 import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
+import com.lowdragmc.lowdraglib2.syncdata.annotation.ReadOnlyManaged;
 import com.lowdragmc.lowdraglib2.utils.PersistedParser;
 import com.mojang.serialization.Codec;
 import com.viscript.npc.util.ConfiguratorUtil;
@@ -21,6 +22,7 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.IntTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -61,6 +63,7 @@ public class NpcInventory implements IConfigurable, IPersistedSerializable {
     @Persisted
     private String lootTable = "";
     @Persisted
+    @ReadOnlyManaged(serializeMethod = "writeLootTables", deserializeMethod = "readLootTables")
     private List<LootTableConfig> lootTables = new ArrayList<>();
 
     static {
@@ -89,7 +92,8 @@ public class NpcInventory implements IConfigurable, IPersistedSerializable {
                 );
             }
             case CUSTOM -> {
-                ArrayConfiguratorGroup<LootTableConfig> lootTableConfigArrayConfiguratorGroup = new ArrayConfiguratorGroup<>("npcConfig.npcInventory.lootTables", false, this::getLootTables,
+                ArrayConfiguratorGroup<LootTableConfig> lootTableConfigArrayConfiguratorGroup = new ArrayConfiguratorGroup<>("npcConfig.npcInventory.lootTables", false,
+                        () -> new ArrayList<>(this.getLootTables()),
                         (getter, setter) -> {
                             LootTableConfig instance = getter.get();
                             return instance != null ? instance.createDirectConfigurator() : new Configurator();
@@ -103,6 +107,18 @@ public class NpcInventory implements IConfigurable, IPersistedSerializable {
                 group.addConfigurator(lootTableConfigArrayConfiguratorGroup);
             }
         }
+    }
+
+    private IntTag writeLootTables(List<LootTableConfig> value) {
+        return IntTag.valueOf(value.size());
+    }
+
+    private List<LootTableConfig> readLootTables(IntTag tag) {
+        var groups = new ArrayList<LootTableConfig>();
+        for (int i = 0; i < tag.getAsInt(); i++) {
+            groups.add(new LootTableConfig());
+        }
+        return groups;
     }
 
     @Getter
