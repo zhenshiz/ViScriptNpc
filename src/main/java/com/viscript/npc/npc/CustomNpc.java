@@ -5,6 +5,7 @@ import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.event.NpcEvent;
 import com.viscript.npc.npc.ai.goal.NpcAttackGoal;
+import com.viscript.npc.npc.ai.mind.MindMachine;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
 import com.viscript.npc.npc.data.attributes.ResistanceConfig;
@@ -15,6 +16,7 @@ import com.viscript.npc.npc.data.mod.integrations.ChatBoxConfig;
 import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
 import com.viscript.npc.util.common.StrUtil;
 import com.zhenshiz.chatbox.utils.chatbox.ChatBoxCommandUtil;
+import lombok.Getter;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -73,11 +75,16 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     public float oBob;
     public float bob;
 
+    // MindMachine
+    @Getter
+    MindMachine mind;
+
     private int targetSelectorCount = 1;
     private int goalSelectorCount = 1;
 
     public CustomNpc(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
+        mind = new MindMachine(this);
     }
 
     @Override
@@ -93,6 +100,9 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
         if (this.level() instanceof ServerLevel) {
             NeoForge.EVENT_BUS.post(new NpcEvent.Tick(this));
         }
+
+        // MindMachine
+        mind.tick();
     }
 
     @Override
