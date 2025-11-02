@@ -7,7 +7,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
 import com.lowdragmc.lowdraglib2.utils.PersistedParser;
 import com.mojang.serialization.Codec;
-import com.viscript.npc.gui.edit.data.NpcConfig;
+import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.util.common.BeanUtil;
 import io.netty.buffer.ByteBuf;
@@ -21,11 +21,13 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.AABB;
+import software.bernie.geckolib.cache.object.BakedGeoModel;
+import software.bernie.geckolib.cache.object.GeoBone;
 
 @Data
 @AllArgsConstructor
@@ -57,28 +59,33 @@ public class NpcDynamicModel implements IConfigurable, IPersistedSerializable {
     @Configurable(name = "npcConfig.npcDynamicModel.aabb")
     private AABB aabb = new AABB(-0.3, 0, -0.3, 0.3, 2, 0.3);
     //缓存的生物，用于让npc展示其模型和材质
-    private LivingEntity entity;
+    private Entity entity;
+    private ResourceLocation tempEntityType;
 
     static {
         CODEC = PersistedParser.createCodec(NpcDynamicModel::new);
         STREAM_CODEC = ByteBufCodecs.fromCodec(CODEC);
     }
 
-    public LivingEntity getEntity(CustomNpc npc) {
-        if (entityType != null) {
-            this.entity = (LivingEntity) (BuiltInRegistries.ENTITY_TYPE.get(this.entityType)).create(npc.level());
+    public Entity getEntity(CustomNpc npc) {
+        // 只有当entityType改变时才需要创建新的实体，否则直接返回缓存的实体。把自己添加到黑名单，防止无限递归
+        if (entityType != null && !entityType.equals(tempEntityType) && !entityType.equals(ViScriptNpc.id("custom_npc"))) {
+            // 因为默认是玩家模型，所以不会有逝
+            if (!BuiltInRegistries.ENTITY_TYPE.containsKey(this.entityType)) return entity;
+            // 如果entityType是玩家，这样是不会创建出玩家实体的，因此entity还是null
+            entity = BuiltInRegistries.ENTITY_TYPE.get(this.entityType).create(npc.level());
             CompoundTag compoundTag = new CompoundTag();
-            if (this.entity != null) {
-                this.entity.addAdditionalSaveData(compoundTag);
-                // 保留扩展兼容，可以给compoundTag添加其它的nbt内容再还给实体
+            if (entity != null) {
+                tempEntityType = entityType;
+                if (entity instanceof LivingEntity living) {
+                    living.addAdditionalSaveData(compoundTag);
+                    // 保留扩展兼容，可以给compoundTag添加其它的nbt内容再还给实体
 
-                this.entity.readAdditionalSaveData(compoundTag);
-                AttributeInstance maxHealth = this.entity.getAttribute(Attributes.MAX_HEALTH);
-                if (maxHealth != null) {
-                    maxHealth.setBaseValue(npc.getMaxHealth());
-                }
-                for (EquipmentSlot slot : EquipmentSlot.values()) {
-                    this.entity.setItemSlot(slot, npc.getItemBySlot(slot));
+                    living.readAdditionalSaveData(compoundTag);
+                    AttributeInstance maxHealth = living.getAttribute(Attributes.MAX_HEALTH);
+                    if (maxHealth != null) {
+                        maxHealth.setBaseValue(npc.getMaxHealth());
+                    }
                 }
             }
         }
@@ -92,6 +99,39 @@ public class NpcDynamicModel implements IConfigurable, IPersistedSerializable {
         BeanUtil.copyProperties(this.armR, model.rightArm);
         BeanUtil.copyProperties(this.legL, model.leftLeg);
         BeanUtil.copyProperties(this.legR, model.rightLeg);
+    }
+
+    public void updateGeoPart(BakedGeoModel model) {
+        for (var geoBone : model.topLevelBones()) {
+            if (tryCopyConfig(geoBone)) continue;
+            for (var child : geoBone.getChildBones()) {
+                tryCopyConfig(child);
+            }
+        }
+    }
+
+    private boolean tryCopyConfig(GeoBone geoBone) {
+        String name = geoBone.getName().toLowerCase();
+        if (name.contains("head")) return copy(head, geoBone);
+        if (name.contains("body")) return copy(body, geoBone);
+        if (name.contains("left") && (name.contains("arm") || name.contains("hand"))) {
+            return copy(armL, geoBone);
+        }
+        if (name.contains("right") && (name.contains("arm") || name.contains("hand"))) {
+            return copy(armR, geoBone);
+        }
+        if (name.contains("left") && (name.contains("leg") || name.contains("foot"))) {
+            return copy(legL, geoBone);
+        }
+        if (name.contains("right") && (name.contains("leg") || name.contains("foot"))) {
+            return copy(legR, geoBone);
+        }
+        return false;
+    }
+
+    private boolean copy(ModelPartConfig config, GeoBone geoBone) {
+        BeanUtil.copyProperties(config.transform(), geoBone);
+        return true;
     }
 
     @Override

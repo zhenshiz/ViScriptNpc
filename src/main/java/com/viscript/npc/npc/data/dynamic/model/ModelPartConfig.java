@@ -19,4 +19,20 @@ public class ModelPartConfig implements IConfigurable, IPersistedSerializable {
     private float zScale = 1.0f;
     @Configurable(name = "npcConfig.npcDynamicModel.modelPartConfig.visible")
     private boolean visible = true;
+
+    public static class GeoBoneConfig {
+        public float scaleX = 1f;
+        public float scaleY = 1f;
+        public float scaleZ = 1f;
+        public boolean hidden = false;
+    }
+
+    public GeoBoneConfig transform() {
+        GeoBoneConfig geoBoneConfig = new GeoBoneConfig();
+        geoBoneConfig.scaleX = this.xScale;
+        geoBoneConfig.scaleY = this.yScale;
+        geoBoneConfig.scaleZ = this.zScale;
+        geoBoneConfig.hidden = !this.visible;
+        return geoBoneConfig;
+    }
 }

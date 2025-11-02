@@ -40,6 +40,14 @@ repositories {
         name = "Modrinth"
         url = "https://api.modrinth.com/maven"
     }
+    maven {
+        name = 'GeckoLib'
+        url 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/'
+        content {
+            includeGroupByRegex("software\\.bernie.*")
+            includeGroup("com.eliotlash.mclib")
+        }
+    }
 }
 
 base {
@@ -140,6 +148,8 @@ dependencies {
     jarJar(implementation("org.appliedenergistics.yoga:yoga:1.0.0"))
     additionalRuntimeClasspath "org.appliedenergistics.yoga:yoga:1.0.0"
     implementation files("libs/CustomNPCs-Unofficial-NeoForge-1.21.1.20241226.jar")
+
+    implementation "software.bernie.geckolib:geckolib-neoforge-1.21.1:4.8.2"
 }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {

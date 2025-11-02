@@ -73,7 +73,7 @@ public class NpcInventory implements IConfigurable, IPersistedSerializable {
 
     @Override
     public void buildConfigurator(ConfiguratorGroup father) {
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.helmet", this::getHelmet, this::setHelmet, ItemTags.HEAD_ARMOR));
+        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.helmet", this::getHelmet, this::setHelmet));
         father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.chestplate", this::getChestplate, this::setChestplate, ItemTags.CHEST_ARMOR));
         father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.leggings", this::getLeggings, this::setLeggings, ItemTags.LEG_ARMOR));
         father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.boots", this::getBoots, this::setBoots, ItemTags.FOOT_ARMOR));

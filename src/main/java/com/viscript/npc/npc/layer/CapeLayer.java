@@ -15,6 +15,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.api.distmarker.Dist;
@@ -33,7 +34,7 @@ public class CapeLayer<T extends CustomNpc, M extends HumanoidModel<T>> extends 
     }
 
     public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, T livingEntity, float limbSwing, float limbSwingAmount, float partialTicks, float ageInTicks, float netHeadYaw, float headPitch) {
-        if (!livingEntity.isInvisible() && livingEntity.getNpcDynamicModel().getEntityType().equals(ResourceLocation.withDefaultNamespace("player"))) {
+        if (!livingEntity.isInvisible() && livingEntity.getNpcDynamicModel().getEntity() == null) { // 为null说明是玩家
             String ct = livingEntity.getNpcBasicsSetting().getCapeTexture();
             if (ct.isEmpty()) return;
             ResourceLocation capeTexture = ResourceLocation.parse(ct);
@@ -65,7 +66,7 @@ public class CapeLayer<T extends CustomNpc, M extends HumanoidModel<T>> extends 
                     poseStack.mulPose(Axis.ZP.rotationDegrees(f3 / 2.0F));
                     poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - f3 / 2.0F));
                     VertexConsumer vertexconsumer = buffer.getBuffer(RenderType.entitySolid(capeTexture));
-                    ((PlayerModel<?>) customNpcRender.npcModel).renderCloak(poseStack, vertexconsumer, packedLight, OverlayTexture.NO_OVERLAY);
+                    ((PlayerModel<?>) customNpcRender.getModel()).renderCloak(poseStack, vertexconsumer, packedLight, OverlayTexture.NO_OVERLAY);
                     poseStack.popPose();
                 }
             }

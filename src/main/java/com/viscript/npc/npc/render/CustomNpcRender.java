@@ -1,117 +1,50 @@
 package com.viscript.npc.npc.render;
 
-import com.google.common.collect.Lists;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.viscript.npc.mixin.aw.LivingEntityRendererAwMixin;
+import com.viscript.npc.ViScriptNpc;
+import com.viscript.npc.mixin.GeoModelAccessor;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
-import com.viscript.npc.npc.layer.ArmorLayer;
 import com.viscript.npc.npc.layer.CapeLayer;
 import com.viscript.npc.npc.layer.INpcAppearancePart;
-import com.viscript.npc.npc.layer.ItemInHandLayer;
+import com.viscript.npc.util.common.BeanUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.model.EntityModel;
-import net.minecraft.client.model.HumanoidModel;
-import net.minecraft.client.model.Model;
+import net.minecraft.client.model.*;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.entity.EntityRenderer;
-import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.LivingEntityRenderer;
-import net.minecraft.client.renderer.entity.RenderLayerParent;
-import net.minecraft.client.renderer.entity.layers.RenderLayer;
+import net.minecraft.client.renderer.entity.*;
+import net.minecraft.client.renderer.entity.layers.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.EntityAttachment;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.ClientHooks;
 import org.joml.Matrix4f;
+import software.bernie.geckolib.cache.object.BakedGeoModel;
+import software.bernie.geckolib.renderer.GeoEntityRenderer;
 
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.util.List;
 
+@SuppressWarnings({"rawtypes"})
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> extends LivingEntityRenderer<T, M> {
-    private LivingEntity livingEntity;
-    private LivingEntityRenderer<T, M> livingEntityRenderer;
-    private CustomNpc npc;
-    // 默认的模型
-    public M npcModel;
-    // 外部替换的模型
-    public Model otherModel;
-    // npc默认的layers
-    private final List<RenderLayer<T, M>> npcLayers = Lists.newArrayList();
-    private final RenderLayer<T, M> renderLayer = new RenderLayer<T, M>((RenderLayerParent) null) {
-        public void render(PoseStack mStack, MultiBufferSource typeBuffer, int lightMapUV, T entity, float limbSwing,
-                           float limbSwingAmount, float partialTicks, float age, float netHeadYaw, float headPitch) {
-            for (Object layer : ((LivingEntityRendererAwMixin) CustomNpcRender.this.livingEntityRenderer).getLayers()) {
-                ((RenderLayer) layer).render(mStack, typeBuffer, lightMapUV, CustomNpcRender.this.livingEntity, limbSwing,
-                        limbSwingAmount, partialTicks, age, netHeadYaw, headPitch);
-            }
-        }
-    };
-    private final HumanoidModel<T> renderModel;
-    private float partialTicks;
 
     public CustomNpcRender(EntityRendererProvider.Context context, M model) {
         super(context, model, 0.5f);
-        this.npcModel = model;
-        this.npcLayers.addAll(this.layers);
-        this.npcLayers.add(new CapeLayer<>(this));
-        this.npcLayers.add(new ItemInHandLayer<>(this, context.getItemInHandRenderer()));
-        this.npcLayers.add(new ArmorLayer<>(this,
+        addLayer(new CapeLayer<>(this));
+        addLayer(new CustomHeadLayer<>(this, context.getModelSet(), context.getItemInHandRenderer()));
+        addLayer(new ElytraLayer<>(this, context.getModelSet()));
+        addLayer(new ItemInHandLayer<>(this, context.getItemInHandRenderer()));
+        addLayer(new HumanoidArmorLayer<>(this,
                 new HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER_INNER_ARMOR)),
                 new HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR)),
                 context.getModelManager()
         ));
-        this.layers.clear();
-        this.layers.addAll(this.npcLayers);
-        this.renderModel = new HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER)) {
-            // 修改模型的颜色渲染
-            public void renderToBuffer(PoseStack mStack, VertexConsumer iVertex, int lightMapUV, int packedOverlayIn,
-                                       int color) {
-                CustomNpcRender.this.otherModel.renderToBuffer(mStack, iVertex, lightMapUV, packedOverlayIn,
-                        color);
-            }
-
-            // 保证npc正常的动画
-            public void setupAnim(T entityIn, float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw,
-                                  float headPitch) {
-                if (CustomNpcRender.this.otherModel instanceof EntityModel entityModel) {
-                    entityModel.setupAnim(CustomNpcRender.this.livingEntity, limbSwing, limbSwingAmount,
-                            ((LivingEntityRendererAwMixin) CustomNpcRender.this.livingEntityRenderer).callGetBob(
-                                    CustomNpcRender.this.livingEntity,
-                                    Minecraft.getInstance().getTimer().getGameTimeDeltaPartialTick(true)),
-                            netHeadYaw, headPitch);
-                }
-
-            }
-
-            // 保证npc各种状态下(蹲、游泳、骑乘、攻击)与实体保持一致
-            public void prepareMobModel(T npc, float animationPos, float animationSpeed, float partialTicks) {
-                if (CustomNpcRender.this.otherModel instanceof HumanoidModel humanoidModel) {
-                    humanoidModel.swimAmount = npc.getSwimAmount(partialTicks);
-                    humanoidModel.crouching = CustomNpcRender.this.npcModel.crouching;
-                }
-
-                if (CustomNpcRender.this.otherModel instanceof EntityModel entityModel) {
-                    entityModel.riding = CustomNpcRender.this.livingEntity.isPassenger()
-                            && CustomNpcRender.this.livingEntity.getVehicle() != null;
-                    entityModel.young = CustomNpcRender.this.livingEntity.isBaby();
-                    entityModel.attackTime = CustomNpcRender.this.getAttackAnim((T) npc, partialTicks);
-                    entityModel.prepareMobModel(CustomNpcRender.this.livingEntity, animationPos, animationSpeed, partialTicks);
-                }
-            }
-        };
     }
 
     @Override
@@ -149,8 +82,7 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
                 font.drawInBatch(customName, mainX, 0, 553648127, false, matrix4f, bufferSource,
                         seeThrough ? Font.DisplayMode.SEE_THROUGH : Font.DisplayMode.NORMAL, bgColor, packedLight);
                 if (seeThrough) {
-                    font.drawInBatch(customName, mainX, 0, -1, false, matrix4f, bufferSource, Font.DisplayMode.NORMAL, 0,
-                            packedLight);
+                    font.drawInBatch(customName, mainX, 0, -1, false, matrix4f, bufferSource, Font.DisplayMode.NORMAL, 0, packedLight);
                 }
 
                 // 副名 / 称号
@@ -162,8 +94,7 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
                     font.drawInBatch(title, titleX, titleY, 553648127, false, matrix4f, bufferSource,
                             seeThrough ? Font.DisplayMode.SEE_THROUGH : Font.DisplayMode.NORMAL, bgColor, packedLight);
                     if (seeThrough) {
-                        font.drawInBatch(title, titleX, titleY, -1, false, matrix4f, bufferSource, Font.DisplayMode.NORMAL, 0,
-                                packedLight);
+                        font.drawInBatch(title, titleX, titleY, -1, false, matrix4f, bufferSource, Font.DisplayMode.NORMAL, 0, packedLight);
                     }
                 }
 
@@ -173,77 +104,59 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
     }
 
     @Override
-    public void render(T npc, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer,
-                       int packedLight) {
-        this.npc = npc;
-        this.partialTicks = partialTicks;
-        this.livingEntity = npc.getNpcDynamicModel().getEntity(this.npc);
-        if (this.livingEntity == null) {
-            // 恢复默认npc的模型
-            this.model = this.npcModel;
-            this.livingEntityRenderer = null;
-            this.layers.clear();
-            this.layers.addAll(this.npcLayers);
+    public void render(T npc, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
+        Entity entity = npc.getNpcDynamicModel().getEntity(npc);
+        if (entity == null) {
             npc.getNpcDynamicModel().updateNpcModelPart(this.model);
         } else {
-            EntityRenderer<? super LivingEntity> render = this.entityRenderDispatcher.getRenderer(this.livingEntity);
-
-            if (render instanceof LivingEntityRenderer) {
-                this.livingEntityRenderer = (LivingEntityRenderer) render;
-                this.otherModel = this.livingEntityRenderer.getModel();
-
-                this.model = (M) this.renderModel;
-                this.layers.clear();
-                this.layers.add(this.renderLayer);
-                if (render instanceof CustomNpcRender) {
-                    for (Object layer : ((LivingEntityRendererAwMixin) this.livingEntityRenderer).getLayers()) {
-                        if (layer instanceof INpcAppearancePart) {
-                            ((INpcAppearancePart) layer).preRender((CustomNpc) this.livingEntity);
-                        }
-                    }
+            // 复制所有需要的npc属性给用于渲染的实体
+            BeanUtil.copyProperties(npc, entity);
+            if (entity instanceof LivingEntity livingEntity) {
+                for (EquipmentSlot value : EquipmentSlot.values()) {
+                    livingEntity.setItemSlot(value, npc.getItemBySlot(value));
                 }
-            } else {
-                this.livingEntityRenderer = null;
-                this.livingEntity = null;
-                this.model = this.npcModel;
-                this.layers.clear();
-                this.layers.addAll(this.npcLayers);
+                var attribute = livingEntity.getAttribute(Attributes.SCALE);
+                if (attribute != null) attribute.setBaseValue(npc.getNpcBasicsSetting().getModeSize());
             }
+
+            EntityRenderer<? super Entity> render = this.entityRenderDispatcher.getRenderer(entity);
+
+            if (render instanceof HumanoidMobRenderer humanoidMobRenderer) { // 修改人形模型参数
+                HumanoidModel rendererModel = (HumanoidModel) humanoidMobRenderer.getModel();
+                npc.getNpcDynamicModel().updateNpcModelPart(rendererModel);
+            } else if (ViScriptNpc.isGeckoLibLoaded() && render instanceof GeoEntityRenderer geoEntityRenderer) {
+                // 修改gecko模型参数
+                BakedGeoModel currentModel = ((GeoModelAccessor) geoEntityRenderer.getGeoModel()).getCurrentModel();
+                if (currentModel != null) npc.getNpcDynamicModel().updateGeoPart(currentModel);
+            } // 直接调用对应实体的渲染方法
+            render.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
+            entityRender(npc, partialTicks, poseStack, buffer, packedLight);
+            return;
         }
 
-        this.npcModel.rightArmPose = this.getPose(npc, npc.getMainHandItem());
-        this.npcModel.leftArmPose = this.getPose(npc, npc.getOffhandItem());
+        for (Object layer : layers) {
+            if (layer instanceof INpcAppearancePart part) {
+                part.preRender(npc);
+            }
+        }
         super.render(npc, entityYaw, partialTicks, poseStack, buffer, packedLight);
         RenderSystem.setShaderColor(1, 1, 1, 1);
     }
 
-    @Override
-    public ResourceLocation getTextureLocation(T t) {
-        if (this.livingEntity != null) {
-            // 使用对应实体的皮肤材质
-            EntityRenderer<? super LivingEntity> render = this.entityRenderDispatcher.getRenderer(this.livingEntity);
-            return render.getTextureLocation(this.livingEntity);
-        } else {
-            return NpcBasicsSetting.SkinType.getSkinType(t.getNpcBasicsSetting());
+    // 渲染拴绳和名称（java就不能直接调用父类的父类的方法吗？还要复制一下，好麻烦）
+    private void entityRender(T npc, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight) {
+        Entity entity = npc.getLeashHolder();
+        if (entity != null) this.renderLeash(npc, partialTick, poseStack, bufferSource, entity);
+
+        var event = new net.neoforged.neoforge.client.event.RenderNameTagEvent(npc, npc.getDisplayName(), this, poseStack, bufferSource, packedLight, partialTick);
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(event);
+        if (event.canRender().isTrue() || event.canRender().isDefault() && this.shouldShowName(npc)) {
+            this.renderNameTag(npc, event.getContent(), poseStack, bufferSource, packedLight, partialTick);
         }
     }
 
-    public HumanoidModel.ArmPose getPose(T npc, ItemStack item) {
-        if (item.isEmpty() || item == ItemStack.EMPTY) {
-            return HumanoidModel.ArmPose.EMPTY;
-        } else {
-            if (npc.getUseItemRemainingTicks() > 0) {
-                UseAnim enumAction = item.getUseAnimation();
-                if (enumAction == UseAnim.BLOCK) {
-                    return HumanoidModel.ArmPose.BLOCK;
-                }
-
-                if (enumAction == UseAnim.BOW) {
-                    return HumanoidModel.ArmPose.BOW_AND_ARROW;
-                }
-            }
-
-            return HumanoidModel.ArmPose.ITEM;
-        }
+    @Override
+    public ResourceLocation getTextureLocation(T t) {
+        return NpcBasicsSetting.SkinType.getSkinType(t.getNpcBasicsSetting());
     }
 }

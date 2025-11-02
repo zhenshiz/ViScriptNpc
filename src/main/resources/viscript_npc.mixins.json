@@ -5,11 +5,11 @@
   "compatibilityLevel": "JAVA_8",
   "refmap": "viscript_npc.refmap.json",
   "mixins": [
-    "LivingEntityMixin"
+    "LivingEntityMixin",
+    "GeoModelAccessor"
   ],
   "client": [
-    "LivingEntityRenderMixin",
-    "aw.LivingEntityRendererAwMixin"
+    "LivingEntityRenderMixin"
   ],
   "injectors": {
     "defaultRequire": 1
