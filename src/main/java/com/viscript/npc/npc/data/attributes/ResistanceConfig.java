@@ -1,13 +1,12 @@
 package com.viscript.npc.npc.data.attributes;
 
-import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
-import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
+import com.viscript.npc.npc.data.INpcData;
 import lombok.Data;
 
 @Data
-public class ResistanceConfig implements IConfigurable, IPersistedSerializable {
+public class ResistanceConfig implements INpcData {
     @Configurable(name = "npcConfig.npcAttributes.resistanceConfig.knockback")
     @ConfigNumber(range = {0, 1}, wheel = 0.01)
     private double knockback = 0;

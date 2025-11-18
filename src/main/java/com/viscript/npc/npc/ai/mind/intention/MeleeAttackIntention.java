@@ -1,10 +1,10 @@
 package com.viscript.npc.npc.ai.mind.intention;
 
+import com.viscript.npc.npc.ai.mind.api.IntentionPriority;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import com.viscript.npc.npc.ai.mind.api.IntentionPriority;
 
 public class MeleeAttackIntention extends FollowIntention {
     @Getter

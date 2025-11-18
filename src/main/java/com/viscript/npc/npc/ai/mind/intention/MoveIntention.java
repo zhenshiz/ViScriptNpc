@@ -1,11 +1,11 @@
 package com.viscript.npc.npc.ai.mind.intention;
 
+import com.viscript.npc.npc.ai.mind.api.IntentionPriority;
+import com.viscript.npc.npc.ai.mind.api.IntentionType;
 import lombok.Getter;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.phys.Vec3;
-import com.viscript.npc.npc.ai.mind.api.IntentionPriority;
-import com.viscript.npc.npc.ai.mind.api.IntentionType;
 
 public class MoveIntention extends SimpleIntention {
     @Getter

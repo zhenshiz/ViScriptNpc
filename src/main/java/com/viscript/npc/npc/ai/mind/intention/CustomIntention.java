@@ -1,12 +1,12 @@
 package com.viscript.npc.npc.ai.mind.intention;
 
+import com.viscript.npc.npc.ai.mind.api.BaseIntention;
+import com.viscript.npc.npc.ai.mind.api.IntentionFunctionRegistries;
+import com.viscript.npc.npc.ai.mind.api.IntentionType;
 import lombok.Getter;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
-import com.viscript.npc.npc.ai.mind.api.BaseIntention;
-import com.viscript.npc.npc.ai.mind.api.IntentionFunctionRegistries;
-import com.viscript.npc.npc.ai.mind.api.IntentionType;
 
 import java.util.HashMap;
 import java.util.Map;

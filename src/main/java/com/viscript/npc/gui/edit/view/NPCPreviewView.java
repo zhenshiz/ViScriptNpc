@@ -21,12 +21,7 @@ import com.viscript.npc.gui.edit.components.SceneToggleBuilder;
 import com.viscript.npc.gui.edit.data.NpcConfig;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.NpcRegister;
-import com.viscript.npc.npc.data.attributes.NpcAttributes;
-import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
 import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
-import com.viscript.npc.npc.data.inventory.NpcInventory;
-import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
-import com.viscript.npc.util.common.StrUtil;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.renderer.GameRenderer;
@@ -42,6 +37,8 @@ import org.appliedenergistics.yoga.YogaGutter;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
+
+import java.util.Objects;
 
 @Getter
 public class NPCPreviewView extends View {
@@ -93,7 +90,7 @@ public class NPCPreviewView extends View {
         sceneEditor.scene.setRenderedCore(level.getFilledBlocks().longStream().mapToObj(BlockPos::of).toList());
         if (editor.project instanceof NPCProject npcProject) {
             NpcConfig npcConfig = npcProject.npc.npcConfig;
-            AABB aabb = npcConfig.getNpcDynamicModel().getAabb();
+            AABB aabb = npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
             npcConfig.transform.scale(new Vector3f((float) aabb.getXsize(), (float) aabb.getYsize(), (float) aabb.getZsize()));
         }
         if (editor.project instanceof NPCProject npcProject) {
@@ -104,7 +101,7 @@ public class NPCPreviewView extends View {
                 Vector3f position = npcConfig.transform().position();
                 customNpc.setPos(position.x, position.y - 1, position.z);
                 Vector3f scale = npcConfig.transform().scale();
-                npcConfig.npcDynamicModel.setAabb(AABB.ofSize(customNpc.position(), scale.x, scale.y, scale.z));
+                npcConfig.getNpcData(NpcDynamicModel.class).setAabb(AABB.ofSize(customNpc.position(), scale.x, scale.y, scale.z));
                 editor.historyView.recordSerializableObject(Component.translatable("npcObject.transform"), npcConfig.transform(), npcConfig);
             });
         }
@@ -128,21 +125,19 @@ public class NPCPreviewView extends View {
             super.renderAfterWorld(bufferSource, partialTicks);
             if (customNpc != null && editor.project instanceof NPCProject npcProject) {
                 NpcConfig npcConfig = npcProject.npc.npcConfig;
+                CompoundTag configTag = npcConfig.serializeNBT(Platform.getFrozenRegistry());
                 CompoundTag compoundTag = new CompoundTag();
-                compoundTag.put(StrUtil.toCamelCase(NpcBasicsSetting.class.getSimpleName()), npcConfig.getNpcBasicsSetting().serializeNBT(Platform.getFrozenRegistry()));
-                compoundTag.put(StrUtil.toCamelCase(NpcDynamicModel.class.getSimpleName()), npcConfig.getNpcDynamicModel().serializeNBT(Platform.getFrozenRegistry()));
-                compoundTag.put(StrUtil.toCamelCase(NpcAttributes.class.getSimpleName()), npcConfig.getNpcAttributes().serializeNBT(Platform.getFrozenRegistry()));
-                compoundTag.put(StrUtil.toCamelCase(NpcInventory.class.getSimpleName()), npcConfig.getNpcInventory().serializeNBT(Platform.getFrozenRegistry()));
-                compoundTag.put(StrUtil.toCamelCase(NpcModIntegrations.class.getSimpleName()), npcConfig.getNpcModIntegrations().serializeNBT(Platform.getFrozenRegistry()));
+                for (var childKey : configTag.getAllKeys()) {
+                    compoundTag.put(childKey, Objects.requireNonNull(configTag.get(childKey)));
+                }
                 customNpc.readAdditionalSaveData(compoundTag);
-                customNpc.updateNpcState();
 
-                AABB aabb = npcConfig.getNpcDynamicModel().getAabb();
+                AABB aabb = npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
                 npcConfig.transform.scale(new Vector3f((float) aabb.getXsize(), (float) aabb.getYsize(), (float) aabb.getZsize()));
             }
 
             if (sceneView().cullBoxVisible && sceneView().editor.project instanceof NPCProject npcProject) {
-                AABB cullBox = npcProject.npc.npcConfig.getNpcDynamicModel().getAabb();
+                AABB cullBox = npcProject.npc.npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
                 if (cullBox != AABB.INFINITE) {
                     RenderSystem.enableBlend();
                     RenderSystem.disableDepthTest();

@@ -1,13 +1,12 @@
 package com.viscript.npc.npc.data.attributes;
 
-import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
-import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
+import com.viscript.npc.npc.data.INpcData;
 import lombok.Data;
 
 @Data
-public class DefenseConfig implements IConfigurable, IPersistedSerializable {
+public class DefenseConfig implements INpcData {
     @Configurable(name = "npcConfig.npcAttributes.defenseConfig.armor")
     @ConfigNumber(range = {0, 30}, wheel = 0.1)
     private float armor = 0;

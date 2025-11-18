@@ -6,20 +6,30 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.mixin.GeoModelAccessor;
 import com.viscript.npc.npc.CustomNpc;
+import com.viscript.npc.npc.data.basics.setting.ILiving;
 import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
 import com.viscript.npc.npc.layer.CapeLayer;
 import com.viscript.npc.npc.layer.INpcAppearancePart;
 import com.viscript.npc.util.common.BeanUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.model.*;
+import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.entity.*;
-import net.minecraft.client.renderer.entity.layers.*;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.entity.HumanoidMobRenderer;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.layers.CustomHeadLayer;
+import net.minecraft.client.renderer.entity.layers.ElytraLayer;
+import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
+import net.minecraft.client.renderer.entity.layers.ItemInHandLayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityAttachment;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.ClientHooks;
@@ -106,12 +116,15 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
     @Override
     public void render(T npc, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         Entity entity = npc.getNpcDynamicModel().getEntity(npc);
+        int color = npc.getNpcBasicsSetting().getSkinColor();
+        ((ILiving) npc).setSkinColor(color);
         if (entity == null) {
             npc.getNpcDynamicModel().updateNpcModelPart(this.model);
         } else {
             // 复制所有需要的npc属性给用于渲染的实体
             BeanUtil.copyProperties(npc, entity);
             if (entity instanceof LivingEntity livingEntity) {
+                ((ILiving) entity).setSkinColor(color);
                 for (EquipmentSlot value : EquipmentSlot.values()) {
                     livingEntity.setItemSlot(value, npc.getItemBySlot(value));
                 }

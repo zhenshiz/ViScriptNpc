@@ -3,7 +3,6 @@ package com.viscript.npc.gui.edit;
 import com.lowdragmc.lowdraglib2.editor.project.IProject;
 import com.lowdragmc.lowdraglib2.editor.ui.Editor;
 import com.lowdragmc.lowdraglib2.gui.texture.SpriteTexture;
-import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.gui.edit.view.NPCPreviewView;

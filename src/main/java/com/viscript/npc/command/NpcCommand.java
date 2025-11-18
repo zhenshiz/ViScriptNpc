@@ -5,7 +5,6 @@ import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import com.viscript.npc.ViScriptNpc;
-import com.viscript.npc.ViScriptNpcRegistries;
 import com.viscript.npc.command.argument.NpcLocationArgument;
 import com.viscript.npc.gui.edit.npc.NPC;
 import com.viscript.npc.network.s2c.OpenNpcEditor;

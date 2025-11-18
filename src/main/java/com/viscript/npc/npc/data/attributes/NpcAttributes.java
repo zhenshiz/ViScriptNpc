@@ -1,18 +1,17 @@
 package com.viscript.npc.npc.data.attributes;
 
-import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
-import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
 import com.lowdragmc.lowdraglib2.utils.PersistedParser;
 import com.mojang.serialization.Codec;
+import com.viscript.npc.npc.data.INpcData;
 import io.netty.buffer.ByteBuf;
 import lombok.Data;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
 @Data
-public class NpcAttributes implements IConfigurable, IPersistedSerializable {
+public class NpcAttributes implements INpcData {
     public static final StreamCodec<ByteBuf, NpcAttributes> STREAM_CODEC;
     public static final Codec<NpcAttributes> CODEC;
 

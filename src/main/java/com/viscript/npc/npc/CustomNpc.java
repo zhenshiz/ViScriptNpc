@@ -5,7 +5,9 @@ import com.lowdragmc.lowdraglib2.math.Range;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.event.NpcEvent;
+import com.viscript.npc.gui.edit.data.NpcConfig;
 import com.viscript.npc.npc.ai.mind.MindMachine;
+import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
 import com.viscript.npc.npc.data.attributes.ResistanceConfig;
@@ -64,15 +66,21 @@ import net.neoforged.neoforge.event.entity.living.*;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.HashMap;
+import java.util.Map;
 
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CustomNpc extends PathfinderMob implements RangedAttackMob {
-    private static final AttachmentType<NpcBasicsSetting> NPC_BASICS_SETTING = NpcAttachmentType.NPC_BASICS_SETTING.get();
-    private static final AttachmentType<NpcDynamicModel> NPC_DYNAMIC_MODEL = NpcAttachmentType.NPC_DYNAMIC_MODEL.get();
-    private static final AttachmentType<NpcAttributes> NPC_ATTRIBUTES = NpcAttachmentType.NPC_ATTRIBUTES.get();
-    private static final AttachmentType<NpcInventory> NPC_INVENTORY = NpcAttachmentType.NPC_INVENTORY.get();
-    private static final AttachmentType<NpcModIntegrations> NPC_MOD_INTEGRATIONS = NpcAttachmentType.NPC_MOD_INTEGRATIONS.get();
+    private static final Map<Class<? extends INpcData>, AttachmentType<? extends INpcData>> NPC_DATA_ATTACHMENTS = new HashMap<>();
+
+    static {
+        putNpcAttachment(NpcBasicsSetting.class,    NpcAttachmentType.NPC_BASICS_SETTING.get());
+        putNpcAttachment(NpcDynamicModel.class,     NpcAttachmentType.NPC_DYNAMIC_MODEL.get());
+        putNpcAttachment(NpcAttributes.class,       NpcAttachmentType.NPC_ATTRIBUTES.get());
+        putNpcAttachment(NpcInventory.class,        NpcAttachmentType.NPC_INVENTORY.get());
+        putNpcAttachment(NpcModIntegrations.class,  NpcAttachmentType.NPC_MOD_INTEGRATIONS.get());
+    }
 
     //披风用参数
     public double xCloakO;
@@ -91,6 +99,16 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     public CustomNpc(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
         mind = new MindMachine(this);
+    }
+
+    public static <T extends INpcData> void putNpcAttachment(Class<T> clazz, AttachmentType<T> attachmentType) {
+        NPC_DATA_ATTACHMENTS.put(clazz, attachmentType);
+        NpcConfig.NPC_DATA_CLASSES.add(clazz);
+    }
+
+    public static <T extends INpcData> AttachmentType<T> getNpcAttachment(Class<T> clazz) {
+        // noinspection unchecked
+        return (AttachmentType<T>) NPC_DATA_ATTACHMENTS.get(clazz);
     }
 
     @Override
@@ -218,44 +236,44 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
         return super.getItemBySlot(slot);
     }
 
+    public static void saveNpcAttachments(CompoundTag tag, CustomNpc npc) {
+        NPC_DATA_ATTACHMENTS.forEach((clazz, attachmentType) ->
+                tag.put(StrUtil.toCamelCase(clazz.getSimpleName()),
+                        npc.getData(getNpcAttachment(clazz)).serializeNBT(Platform.getFrozenRegistry())));
+    }
+
     @Override
     public void addAdditionalSaveData(CompoundTag compoundTag) {
         super.addAdditionalSaveData(compoundTag);
-        compoundTag.put(StrUtil.toCamelCase(NpcBasicsSetting.class.getSimpleName()), getNpcBasicsSetting().serializeNBT(Platform.getFrozenRegistry()));
-        compoundTag.put(StrUtil.toCamelCase(NpcDynamicModel.class.getSimpleName()), getNpcDynamicModel().serializeNBT(Platform.getFrozenRegistry()));
-        compoundTag.put(StrUtil.toCamelCase(NpcAttributes.class.getSimpleName()), getNpcAttributes().serializeNBT(Platform.getFrozenRegistry()));
-        compoundTag.put(StrUtil.toCamelCase(NpcInventory.class.getSimpleName()), getNpcInventory().serializeNBT(Platform.getFrozenRegistry()));
-        compoundTag.put(StrUtil.toCamelCase(NpcModIntegrations.class.getSimpleName()), getNpcModIntegrations().serializeNBT(Platform.getFrozenRegistry()));
+        saveNpcAttachments(compoundTag, this);
         updateNpcState();
+    }
+
+    public static void readNpcAttachments(CompoundTag tag, CustomNpc npc) {
+        NPC_DATA_ATTACHMENTS.forEach((clazz, attachmentType) ->
+                npc.getData(getNpcAttachment(clazz)).deserializeNBT(Platform.getFrozenRegistry(),
+                        tag.getCompound(StrUtil.toCamelCase(clazz.getSimpleName()))));
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag compoundTag) {
         super.readAdditionalSaveData(compoundTag);
-        getNpcBasicsSetting().deserializeNBT(Platform.getFrozenRegistry(), compoundTag.getCompound(StrUtil.toCamelCase(NpcBasicsSetting.class.getSimpleName())));
-        getNpcDynamicModel().deserializeNBT(Platform.getFrozenRegistry(), compoundTag.getCompound(StrUtil.toCamelCase(NpcDynamicModel.class.getSimpleName())));
-        getNpcAttributes().deserializeNBT(Platform.getFrozenRegistry(), compoundTag.getCompound(StrUtil.toCamelCase(NpcAttributes.class.getSimpleName())));
-        getNpcInventory().deserializeNBT(Platform.getFrozenRegistry(), compoundTag.getCompound(StrUtil.toCamelCase(NpcInventory.class.getSimpleName())));
-        getNpcModIntegrations().deserializeNBT(Platform.getFrozenRegistry(), compoundTag.getCompound(StrUtil.toCamelCase(NpcModIntegrations.class.getSimpleName())));
+        readNpcAttachments(compoundTag, this);
         updateNpcState();
     }
 
     public void updateNpcState() {
         //基础信息
         NpcBasicsSetting npcBasicsSetting = getNpcBasicsSetting();
-        this.setData(NPC_BASICS_SETTING, npcBasicsSetting);
         this.setAttributeBaseValue(Attributes.SCALE, npcBasicsSetting.getModeSize());
         this.setInvulnerable(npcBasicsSetting.isInvulnerable());
         this.setNoAi(npcBasicsSetting.isNoAI());
         this.setNoGravity(npcBasicsSetting.isNoGravity());
 
         //动态模型
-        NpcDynamicModel npcDynamicModel = getNpcDynamicModel();
-        this.setData(NPC_DYNAMIC_MODEL, npcDynamicModel);
 
         //NPC属性
         NpcAttributes npcAttributes = getNpcAttributes();
-        this.setData(NPC_ATTRIBUTES, npcAttributes);
         this.setAttributeBaseValue(Attributes.MAX_HEALTH, npcAttributes.getMaxHealth());
         this.setAttributeBaseValue(Attributes.MOVEMENT_SPEED, npcAttributes.getMovementSpeed());
         this.setAttributeBaseValue(Attributes.FOLLOW_RANGE, npcAttributes.getFollowRange());
@@ -271,8 +289,6 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
 
 
         //联动模组
-        NpcModIntegrations npcModIntegrations = getNpcModIntegrations();
-        this.setData(NPC_MOD_INTEGRATIONS, npcModIntegrations);
     }
 
     @Override
@@ -354,23 +370,23 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     }
 
     public NpcBasicsSetting getNpcBasicsSetting() {
-        return this.getData(NPC_BASICS_SETTING);
+        return this.getData(getNpcAttachment(NpcBasicsSetting.class));
     }
 
     public NpcDynamicModel getNpcDynamicModel() {
-        return this.getData(NPC_DYNAMIC_MODEL);
+        return this.getData(getNpcAttachment(NpcDynamicModel.class));
     }
 
     public NpcAttributes getNpcAttributes() {
-        return this.getData(NPC_ATTRIBUTES);
+        return this.getData(getNpcAttachment(NpcAttributes.class));
     }
 
     public NpcModIntegrations getNpcModIntegrations() {
-        return this.getData(NPC_MOD_INTEGRATIONS);
+        return this.getData(getNpcAttachment(NpcModIntegrations.class));
     }
 
     public NpcInventory getNpcInventory() {
-        return this.getData(NPC_INVENTORY);
+        return this.getData(getNpcAttachment(NpcInventory.class));
     }
 
     private void setAttributeBaseValue(Holder<Attribute> attribute, double value) {

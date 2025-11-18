@@ -1,14 +1,13 @@
 package com.viscript.npc.npc.data.mod.integrations;
 
-import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.ui.BooleanConfigurator;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.configurator.ui.NumberConfigurator;
 import com.lowdragmc.lowdraglib2.configurator.ui.SearchComponentConfigurator;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
-import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.viscript.npc.ViScriptNpc;
+import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.ConfiguratorUtil;
 import com.zhenshiz.chatbox.data.ChatBoxDialoguesLoader;
 import lombok.Data;
@@ -17,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.stream.Collectors;
 
 @Data
-public class ChatBoxConfig implements IConfigurable, IPersistedSerializable {
+public class ChatBoxConfig implements INpcData {
     @Persisted
     private boolean enabled = false;
     @Persisted
@@ -29,7 +28,7 @@ public class ChatBoxConfig implements IConfigurable, IPersistedSerializable {
 
     @Override
     public void buildConfigurator(ConfiguratorGroup father) {
-        IConfigurable.super.buildConfigurator(father);
+        INpcData.super.buildConfigurator(father);
         if (ViScriptNpc.isChatBoxLoaded()) {
             father.addConfigurator(createEnabledConfigurator(father));
         }

@@ -39,6 +39,7 @@
   "npcConfig.npcDynamicModel": "NPC模型配置",
   "npcConfig.npcDynamicModel.entityType": "生物类型",
   "npcConfig.npcDynamicModel.entityType.tips": "使用该生物的模型和材质",
+  "npcConfig.npcDynamicModel.nbt": "NBT",
   "npcConfig.npcDynamicModel.head": "头部",
   "npcConfig.npcDynamicModel.body": "躯干",
   "npcConfig.npcDynamicModel.armNotShared": "双臂左右同步",
@@ -50,7 +51,7 @@
   "npcConfig.npcDynamicModel.modelPartConfig.xScale": "宽度",
   "npcConfig.npcDynamicModel.modelPartConfig.yScale": "高度",
   "npcConfig.npcDynamicModel.modelPartConfig.zScale": "深度",
-  "npcConfig.npcDynamicModel.modelPartConfig.visible": "隐藏",
+  "npcConfig.npcDynamicModel.modelPartConfig.visible": "可见",
   "npcConfig.npcDynamicModel.aabb": "碰撞箱",
 
   "npcConfig.npcAttributes": "NPC属性",

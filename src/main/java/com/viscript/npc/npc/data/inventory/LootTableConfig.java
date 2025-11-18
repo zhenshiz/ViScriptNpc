@@ -1,14 +1,13 @@
 package com.viscript.npc.npc.data.inventory;
 
-import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
-import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
+import com.viscript.npc.npc.data.INpcData;
 import lombok.Data;
 import net.minecraft.world.item.Items;
 
 @Data
-public class LootTableConfig implements IConfigurable, IPersistedSerializable {
+public class LootTableConfig implements INpcData {
     @Configurable(name = "npcConfig.npcInventory.LootTableConfig.item")
     private String item = Items.AIR.toString();
     @Configurable(name = "npcConfig.npcInventory.LootTableConfig.name")

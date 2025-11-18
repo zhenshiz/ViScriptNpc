@@ -1,14 +1,14 @@
 package com.viscript.npc.npc.ai.mind;
 
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
-import net.minecraft.world.entity.Entity;
 import com.viscript.npc.npc.ai.mind.api.BaseIntention;
 import com.viscript.npc.npc.ai.mind.api.IntentionPriority;
 import com.viscript.npc.npc.ai.mind.api.IntentionType;
 import com.viscript.npc.npc.ai.mind.intention.SimpleIntention;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import net.minecraft.world.entity.Entity;
 
 import java.util.Collections;
 import java.util.LinkedList;

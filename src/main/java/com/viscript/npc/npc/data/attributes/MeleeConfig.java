@@ -1,6 +1,5 @@
 package com.viscript.npc.npc.data.attributes;
 
-import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigSelector;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
@@ -8,11 +7,11 @@ import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.configurator.ui.NumberConfigurator;
 import com.lowdragmc.lowdraglib2.configurator.ui.SearchComponentConfigurator;
 import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
-import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.lowdragmc.lowdraglib2.utils.search.IResultHandler;
 import com.viscript.npc.gui.edit.texture.MobEffectTexture;
 import com.viscript.npc.npc.CustomNpc;
+import com.viscript.npc.npc.data.INpcData;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
@@ -29,7 +28,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Objects;
 
 @Data
-public class MeleeConfig implements IConfigurable, IPersistedSerializable {
+public class MeleeConfig implements INpcData {
     @Configurable(name = "npcConfig.npcAttributes.meleeConfig.attackDamage")
     @ConfigNumber(range = {0, 2048}, wheel = 0.1)
     private double attackDamage = 2;

@@ -1,13 +1,12 @@
 package com.viscript.npc.npc.data.dynamic.model;
 
-import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
-import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
+import com.viscript.npc.npc.data.INpcData;
 import lombok.Data;
 
 @Data
-public class ModelPartConfig implements IConfigurable, IPersistedSerializable {
+public class ModelPartConfig implements INpcData {
     @Configurable(name = "npcConfig.npcDynamicModel.modelPartConfig.xScale")
     @ConfigNumber(range = {0, Float.MAX_VALUE})
     private float xScale = 1.0f;

@@ -77,7 +77,11 @@ public class SelectItemDialog extends Dialog {
     private ItemSlot createItemSlot(ItemStack stack) {
         ItemSlot slot = new ItemSlot();
 
-        slot.setItem(stack.isEmpty() ? ItemStack.EMPTY : stack);
+        ItemStack setStack = stack;
+        if (stack.isEmpty()) setStack = ItemStack.EMPTY;
+        else if (tags != null && !isItemInTags(stack, tags)) setStack = ItemStack.EMPTY;
+
+        slot.setItem(setStack);
 
         slot.layout(layout -> {
             layout.setWidth(18);
@@ -93,5 +97,14 @@ public class SelectItemDialog extends Dialog {
         });
 
         return slot;
+    }
+
+    public static boolean isItemInTags(ItemStack stack, Set<TagKey<Item>> tags) {
+        if (stack.isEmpty()) return false;
+        if (tags == null) return false;
+        for (TagKey<Item> tag : tags) {
+            if (stack.is(tag)) return true;
+        }
+        return false;
     }
 }

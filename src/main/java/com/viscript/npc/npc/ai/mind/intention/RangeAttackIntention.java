@@ -1,8 +1,8 @@
 package com.viscript.npc.npc.ai.mind.intention;
 
+import com.viscript.npc.npc.ai.mind.api.IntentionPriority;
 import lombok.Setter;
 import net.minecraft.world.entity.Entity;
-import com.viscript.npc.npc.ai.mind.api.IntentionPriority;
 
 import java.util.function.BiConsumer;
 

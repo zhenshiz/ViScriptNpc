@@ -2,7 +2,6 @@ package com.viscript.npc.gui.edit.npc;
 
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.gui.edit.data.NpcConfig;
-import com.viscript.npc.npc.CustomNpc;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.core.HolderLookup;

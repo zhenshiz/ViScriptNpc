@@ -1,7 +1,6 @@
 package com.viscript.npc.npc.data.inventory;
 
 import com.lowdragmc.lowdraglib2.Platform;
-import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber.Type;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigSelector;
@@ -10,12 +9,12 @@ import com.lowdragmc.lowdraglib2.configurator.ui.ArrayConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.configurator.ui.Configurator;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.math.Range;
-import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.ReadOnlyManaged;
 import com.lowdragmc.lowdraglib2.utils.PersistedParser;
 import com.mojang.serialization.Codec;
 import com.viscript.npc.configurator.annotation.ConfigItemStack;
+import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.ConfiguratorUtil;
 import io.netty.buffer.ByteBuf;
 import lombok.AllArgsConstructor;
@@ -39,7 +38,7 @@ import java.util.stream.Collectors;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class NpcInventory implements IConfigurable, IPersistedSerializable {
+public class NpcInventory implements INpcData {
     public static final StreamCodec<ByteBuf, NpcInventory> STREAM_CODEC;
     public static final Codec<NpcInventory> CODEC;
     @Configurable(name = "npcConfig.npcInventory.helmet")

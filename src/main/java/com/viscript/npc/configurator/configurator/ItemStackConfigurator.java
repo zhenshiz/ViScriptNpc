@@ -63,7 +63,7 @@ public class ItemStackConfigurator extends ValueConfigurator<ItemStack> {
 
     public void setTag(String[] tags) {
         for (String tag : tags) {
-            if (tag == null || tag.isEmpty()) return;
+            if (tag == null || tag.isEmpty()) continue;
             selectItemDialog.tags.add(TagKey.create(Registries.ITEM, ResourceLocation.parse(tag)));
         }
     }

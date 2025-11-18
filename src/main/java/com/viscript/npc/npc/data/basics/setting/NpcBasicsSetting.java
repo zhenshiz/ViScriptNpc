@@ -1,17 +1,16 @@
 package com.viscript.npc.npc.data.basics.setting;
 
-import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigColor;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigSelector;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.configurator.ui.StringConfigurator;
-import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.lowdragmc.lowdraglib2.utils.PersistedParser;
 import com.mojang.serialization.Codec;
 import com.viscript.npc.ViScriptNpc;
+import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.RenderUtil;
 import com.viscript.npc.util.common.StrUtil;
 import io.netty.buffer.ByteBuf;
@@ -33,7 +32,7 @@ import org.jetbrains.annotations.NotNull;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class NpcBasicsSetting implements IConfigurable, IPersistedSerializable {
+public class NpcBasicsSetting implements INpcData {
     public static final StreamCodec<ByteBuf, NpcBasicsSetting> STREAM_CODEC;
     public static final Codec<NpcBasicsSetting> CODEC;
     @Configurable(name = "npcConfig.npcBasicsSetting.customName")

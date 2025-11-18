@@ -5,8 +5,9 @@
   "compatibilityLevel": "JAVA_8",
   "refmap": "viscript_npc.refmap.json",
   "mixins": [
-    "LivingEntityMixin",
-    "GeoModelAccessor"
+    "EntityPredicateMixin",
+    "GeoModelAccessor",
+    "LivingEntityMixin"
   ],
   "client": [
     "LivingEntityRenderMixin"
