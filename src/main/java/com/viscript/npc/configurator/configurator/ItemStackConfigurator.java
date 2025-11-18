@@ -7,6 +7,7 @@ import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ItemSlot;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.viscript.npc.gui.edit.components.SelectItemDialog;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
@@ -65,6 +66,9 @@ public class ItemStackConfigurator extends ValueConfigurator<ItemStack> {
         for (String tag : tags) {
             if (tag == null || tag.isEmpty()) continue;
             selectItemDialog.tags.add(TagKey.create(Registries.ITEM, ResourceLocation.parse(tag)));
+        }
+        if (Minecraft.getInstance().player != null) {
+            selectItemDialog.reloadUI(Minecraft.getInstance().player);
         }
     }
 
