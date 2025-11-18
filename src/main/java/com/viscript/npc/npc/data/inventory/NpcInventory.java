@@ -15,6 +15,7 @@ import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.ReadOnlyManaged;
 import com.lowdragmc.lowdraglib2.utils.PersistedParser;
 import com.mojang.serialization.Codec;
+import com.viscript.npc.configurator.annotation.ConfigItemStack;
 import com.viscript.npc.util.ConfiguratorUtil;
 import io.netty.buffer.ByteBuf;
 import lombok.AllArgsConstructor;
@@ -27,9 +28,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.ItemTags;
 import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -42,18 +42,21 @@ import java.util.stream.Collectors;
 public class NpcInventory implements IConfigurable, IPersistedSerializable {
     public static final StreamCodec<ByteBuf, NpcInventory> STREAM_CODEC;
     public static final Codec<NpcInventory> CODEC;
-    @Persisted
-    private String helmet = Items.AIR.toString();
-    @Persisted
-    private String chestplate = Items.AIR.toString();
-    @Persisted
-    private String leggings = Items.AIR.toString();
-    @Persisted
-    private String boots = Items.AIR.toString();
-    @Persisted
-    private String mainHand = Items.AIR.toString();
-    @Persisted
-    private String offHand = Items.AIR.toString();
+    @Configurable(name = "npcConfig.npcInventory.helmet")
+    private ItemStack helmet = ItemStack.EMPTY;
+    @Configurable(name = "npcConfig.npcInventory.chestplate")
+    @ConfigItemStack(tag = "chest_armor")
+    private ItemStack chestplate = ItemStack.EMPTY;
+    @Configurable(name = "npcConfig.npcInventory.leggings")
+    @ConfigItemStack(tag = "leg_armor")
+    private ItemStack leggings = ItemStack.EMPTY;
+    @Configurable(name = "npcConfig.npcInventory.boots")
+    @ConfigItemStack(tag = "foot_armor")
+    private ItemStack boots = ItemStack.EMPTY;
+    @Configurable(name = "npcConfig.npcInventory.mainHand")
+    private ItemStack mainHand = ItemStack.EMPTY;
+    @Configurable(name = "npcConfig.npcInventory.offHand")
+    private ItemStack offHand = ItemStack.EMPTY;
     @Configurable(name = "npcConfig.npcInventory.levelRange")
     @ConfigNumber(range = {0, Integer.MAX_VALUE}, type = Type.INTEGER)
     private Range levelRange = Range.of(0, 0);
@@ -69,17 +72,6 @@ public class NpcInventory implements IConfigurable, IPersistedSerializable {
     static {
         CODEC = PersistedParser.createCodec(NpcInventory::new);
         STREAM_CODEC = ByteBufCodecs.fromCodec(CODEC);
-    }
-
-    @Override
-    public void buildConfigurator(ConfiguratorGroup father) {
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.helmet", this::getHelmet, this::setHelmet));
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.chestplate", this::getChestplate, this::setChestplate, ItemTags.CHEST_ARMOR));
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.leggings", this::getLeggings, this::setLeggings, ItemTags.LEG_ARMOR));
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.boots", this::getBoots, this::setBoots, ItemTags.FOOT_ARMOR));
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.mainHand", this::getMainHand, this::setMainHand));
-        father.addConfigurator(ConfiguratorUtil.createItemSearchComponentConfigurator("npcConfig.npcInventory.offHand", this::getOffHand, this::setOffHand));
-        IConfigurable.super.buildConfigurator(father);
     }
 
     private void LootTableTypeSubConfiguratorBuilder(LootTableType value, ConfiguratorGroup group) {

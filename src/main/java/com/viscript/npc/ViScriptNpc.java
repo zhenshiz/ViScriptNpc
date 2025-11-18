@@ -5,6 +5,7 @@ import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
 import com.mojang.logging.LogUtils;
 import com.viscript.npc.command.ICommand;
 import com.viscript.npc.command.argument.ArgumentRegister;
+import com.viscript.npc.configurator.SyncAccessor;
 import com.viscript.npc.npc.NpcAttachmentType;
 import com.viscript.npc.npc.NpcRegister;
 import net.minecraft.client.Minecraft;
@@ -30,6 +31,7 @@ public class ViScriptNpc {
         ArgumentRegister.ARGUMENT_TYPE.register(modEventBus);
         NpcRegister.ENTITY_TYPES.register(modEventBus);
         NpcAttachmentType.ATTACHMENT_TYPES.register(modEventBus);
+        SyncAccessor.init();
     }
 
     //注册指令

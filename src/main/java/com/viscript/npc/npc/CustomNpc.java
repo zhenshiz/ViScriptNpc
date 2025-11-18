@@ -15,7 +15,6 @@ import com.viscript.npc.npc.data.inventory.LootTableConfig;
 import com.viscript.npc.npc.data.inventory.NpcInventory;
 import com.viscript.npc.npc.data.mod.integrations.ChatBoxConfig;
 import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
-import com.viscript.npc.util.common.BeanUtil;
 import com.viscript.npc.util.common.StrUtil;
 import com.zhenshiz.chatbox.utils.chatbox.ChatBoxCommandUtil;
 import lombok.Getter;
@@ -205,16 +204,15 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     public ItemStack getItemBySlot(EquipmentSlot slot) {
         if (level().isClientSide()) { // 仅用于客户端渲染，完全不影响实际物品槽位
             NpcInventory inventory = getNpcInventory();
-            ResourceLocation location = switch (slot) {
-                case HEAD -> ResourceLocation.parse(inventory.getHelmet());
-                case CHEST -> ResourceLocation.parse(inventory.getChestplate());
-                case LEGS -> ResourceLocation.parse(inventory.getLeggings());
-                case FEET -> ResourceLocation.parse(inventory.getBoots());
-                case MAINHAND -> ResourceLocation.parse(inventory.getMainHand());
-                case OFFHAND -> ResourceLocation.parse(inventory.getOffHand());
-                case BODY -> ResourceLocation.parse("minecraft:air");
+            ItemStack stack = switch (slot) {
+                case HEAD -> inventory.getHelmet();
+                case CHEST -> inventory.getChestplate();
+                case LEGS -> inventory.getLeggings();
+                case FEET -> inventory.getBoots();
+                case MAINHAND -> inventory.getMainHand();
+                case OFFHAND -> inventory.getOffHand();
+                case BODY -> ItemStack.EMPTY;
             };
-            ItemStack stack = BeanUtil.getValueOrDefault(BuiltInRegistries.ITEM.get(location), Items.AIR).getDefaultInstance();
             if (!stack.isEmpty()) return stack;
         }
         return super.getItemBySlot(slot);

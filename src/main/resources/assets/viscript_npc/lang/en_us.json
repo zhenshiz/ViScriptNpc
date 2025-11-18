@@ -9,6 +9,8 @@
   "viscript_npc.editor.view.npcList": "",
   "viscript_npc.editor.view.preview": "",
   "viscript_npc.editor.view.button.is_cull_box_visible": "开关碰撞箱提示框",
+  "viscript_npc.configurator.item.count": "数量",
+  "viscript_npc.selectItemDialog.title": "选择物品",
   "npcObject.name": "",
   "npcObject.transform": "",
   "npcConfig.npcBasicsSetting": "",
