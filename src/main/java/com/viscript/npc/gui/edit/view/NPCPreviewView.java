@@ -29,6 +29,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import org.appliedenergistics.yoga.YogaEdge;
@@ -37,8 +38,6 @@ import org.appliedenergistics.yoga.YogaGutter;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
-
-import java.util.Objects;
 
 @Getter
 public class NPCPreviewView extends View {
@@ -83,18 +82,14 @@ public class NPCPreviewView extends View {
                 i++;
             }
         }
-        if (customNpc != null) {
-            customNpc.setPos(0, 1, 0);
-            level.addEntity(customNpc);
-        }
+        customNpc.setPos(0, 1, 0);
+        level.addEntity(customNpc);
         sceneEditor.scene.setRenderedCore(level.getFilledBlocks().longStream().mapToObj(BlockPos::of).toList());
-        if (editor.project instanceof NPCProject npcProject) {
+        if (editor.getCurrentProject() instanceof NPCProject npcProject) {
             NpcConfig npcConfig = npcProject.npc.npcConfig;
             AABB aabb = npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
             npcConfig.transform.scale(new Vector3f((float) aabb.getXsize(), (float) aabb.getYsize(), (float) aabb.getZsize()));
-        }
-        if (editor.project instanceof NPCProject npcProject) {
-            NpcConfig npcConfig = npcProject.npc.npcConfig;
+
             npcConfig.transform().position(customNpc.position().toVector3f().add(0, 1, 0));
             sceneEditor.addSceneObject(npcConfig);
             sceneEditor.setTransformGizmoTarget(npcConfig.transform(), () -> {
@@ -121,22 +116,29 @@ public class NPCPreviewView extends View {
         }
 
         @Override
+        public void screenTick() {
+            super.screenTick();
+            if (customNpc != null) {
+                Entity entity = customNpc.getNpcDynamicModel().getEntity(customNpc);
+                try { // 某些生物的AI会导致奇怪的崩溃
+                    if (entity != null) entity.tick();
+                } catch (Exception ignored) {}
+            }
+        }
+
+        @Override
         protected void renderAfterWorld(@NotNull MultiBufferSource bufferSource, float partialTicks) {
             super.renderAfterWorld(bufferSource, partialTicks);
-            if (customNpc != null && editor.project instanceof NPCProject npcProject) {
+            if (customNpc != null && editor.getCurrentProject() instanceof NPCProject npcProject) {
                 NpcConfig npcConfig = npcProject.npc.npcConfig;
                 CompoundTag configTag = npcConfig.serializeNBT(Platform.getFrozenRegistry());
-                CompoundTag compoundTag = new CompoundTag();
-                for (var childKey : configTag.getAllKeys()) {
-                    compoundTag.put(childKey, Objects.requireNonNull(configTag.get(childKey)));
-                }
-                customNpc.readAdditionalSaveData(compoundTag);
+                customNpc.readAdditionalSaveData(configTag);
 
                 AABB aabb = npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
                 npcConfig.transform.scale(new Vector3f((float) aabb.getXsize(), (float) aabb.getYsize(), (float) aabb.getZsize()));
             }
 
-            if (sceneView().cullBoxVisible && sceneView().editor.project instanceof NPCProject npcProject) {
+            if (sceneView().cullBoxVisible && sceneView().editor.getCurrentProject() instanceof NPCProject npcProject) {
                 AABB cullBox = npcProject.npc.npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
                 if (cullBox != AABB.INFINITE) {
                     RenderSystem.enableBlend();

@@ -20,6 +20,7 @@ import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
 import com.viscript.npc.util.common.StrUtil;
 import com.zhenshiz.chatbox.utils.chatbox.ChatBoxCommandUtil;
 import lombok.Getter;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -127,6 +128,12 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
 
         // MindMachine
         mind.tick();
+        if (level() instanceof ClientLevel) {
+            Entity entity = getNpcDynamicModel().getEntity(this);
+            try { // 某些生物的AI会导致奇怪的崩溃
+                if (entity != null) entity.tick();
+            } catch (Exception ignored) {}
+        }
     }
 
     @Override
@@ -236,19 +243,6 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
         return super.getItemBySlot(slot);
     }
 
-    public static void saveNpcAttachments(CompoundTag tag, CustomNpc npc) {
-        NPC_DATA_ATTACHMENTS.forEach((clazz, attachmentType) ->
-                tag.put(StrUtil.toCamelCase(clazz.getSimpleName()),
-                        npc.getData(getNpcAttachment(clazz)).serializeNBT(Platform.getFrozenRegistry())));
-    }
-
-    @Override
-    public void addAdditionalSaveData(CompoundTag compoundTag) {
-        super.addAdditionalSaveData(compoundTag);
-        saveNpcAttachments(compoundTag, this);
-        updateNpcState();
-    }
-
     public static void readNpcAttachments(CompoundTag tag, CustomNpc npc) {
         NPC_DATA_ATTACHMENTS.forEach((clazz, attachmentType) ->
                 npc.getData(getNpcAttachment(clazz)).deserializeNBT(Platform.getFrozenRegistry(),
@@ -263,6 +257,7 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     }
 
     public void updateNpcState() {
+        NPC_DATA_ATTACHMENTS.forEach((clazz, a) -> syncData(getNpcAttachment(clazz)));
         //基础信息
         NpcBasicsSetting npcBasicsSetting = getNpcBasicsSetting();
         this.setAttributeBaseValue(Attributes.SCALE, npcBasicsSetting.getModeSize());

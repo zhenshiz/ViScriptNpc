@@ -48,6 +48,15 @@ public class NpcAttributes implements INpcData {
     //是否忽略蜘蛛网的影响
     @Configurable(name = "npcConfig.npcAttributes.isIgnoreCobweb")
     private boolean isIgnoreCobweb = false;
+    //是否受亡灵杀手影响
+    @Configurable(name = "npcConfig.npcAttributes.sensitiveToSmite")
+    private boolean sensitiveToSmite = false;
+    //是否受节肢杀手影响
+    @Configurable(name = "npcConfig.npcAttributes.sensitiveToBaneOfArthropods")
+    private boolean sensitiveToBaneOfArthropods = false;
+    //是否受穿刺影响
+    @Configurable(name = "npcConfig.npcAttributes.sensitiveToImpaling")
+    private boolean sensitiveToImpaling = false;
     //战时回血
     @Configurable(name = "npcConfig.npcAttributes.combatRegenRate", tips = "npcConfig.npcAttributes.regenRate.tips")
     @ConfigNumber(range = {0, Integer.MAX_VALUE}, wheel = 0.1)

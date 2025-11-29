@@ -1,6 +1,7 @@
 package com.viscript.npc.network;
 
 import com.viscript.npc.ViScriptNpc;
+import com.viscript.npc.network.c2s.CreateNpc;
 import com.viscript.npc.network.s2c.OpenNpcEditor;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -17,5 +18,6 @@ public class ViScriptNpcNetwork {
         registrar.commonToClient(OpenNpcEditor.TYPE, OpenNpcEditor.CODEC, OpenNpcEditor::execute);
 
         //c2s
+        registrar.commonToServer(CreateNpc.TYPE, CreateNpc.CODEC, CreateNpc::execute);
     }
 }

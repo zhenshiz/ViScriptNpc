@@ -27,9 +27,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
-import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.AABB;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
 import software.bernie.geckolib.cache.object.GeoBone;
@@ -93,24 +90,11 @@ public class NpcDynamicModel implements INpcData {
             if (!BuiltInRegistries.ENTITY_TYPE.containsKey(this.entityType)) return entity;
             // 如果entityType是玩家，这样是不会创建出玩家实体的，因此entity还是null
             entity = BuiltInRegistries.ENTITY_TYPE.get(this.entityType).create(npc.level());
-            CompoundTag compoundTag = new CompoundTag();
             if (entity != null) {
                 tempEntityType = entityType;
-                if (entity instanceof LivingEntity living) {
-                    living.addAdditionalSaveData(compoundTag);
-                    // 保留扩展兼容，可以给compoundTag添加其它的nbt内容再还给实体
-
-                    living.readAdditionalSaveData(compoundTag);
-                    AttributeInstance maxHealth = living.getAttribute(Attributes.MAX_HEALTH);
-                    if (maxHealth != null) {
-                        maxHealth.setBaseValue(npc.getMaxHealth());
-                    }
-                }
             }
         }
-        if (entity instanceof LivingEntity living) {
-            living.readAdditionalSaveData(tagFromString(nbt));
-        }
+        if (entity != null) entity.load(tagFromString(nbt));
         return this.entity;
     }
 

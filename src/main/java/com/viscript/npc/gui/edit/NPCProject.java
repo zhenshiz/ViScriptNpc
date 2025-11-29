@@ -32,6 +32,7 @@ public class NPCProject implements IProject {
     @Getter
     private final Resources resources;
     public NPC npc = new NPC();
+    public int currentNpcId = -1;
 
     // runtime
     //导出npc数据文本按钮

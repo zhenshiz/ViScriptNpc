@@ -19,7 +19,6 @@ public class NpcEditor extends Editor {
 
     public final NpcListView npcListView = new NpcListView(this);
     public final NPCPreviewView npcPreviewView = new NPCPreviewView(this);
-    public IProject project;
 
     public NpcEditor() {
         fileMenu.addProjectProvider(NPCProject.PROVIDER);
@@ -32,7 +31,6 @@ public class NpcEditor extends Editor {
     protected void loadNewProject(IProject project, @Nullable File projectFile) {
         if (project instanceof NPCProject npcProject) {
             super.loadNewProject(project, projectFile);
-            this.project = npcProject;
             inspectorView.inspect(npcProject.npc.npcConfig);
             npcPreviewView.loadScene();
         }
