@@ -2,12 +2,13 @@ package com.viscript.npc;
 
 import com.lowdragmc.lowdraglib2.registry.AutoRegistry;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
+import com.lowdragmc.lowdraglib2.utils.ReflectionUtils;
 import com.mojang.logging.LogUtils;
 import com.viscript.npc.command.ICommand;
-import com.viscript.npc.command.argument.ArgumentRegister;
-import com.viscript.npc.configurator.SyncAccessor;
 import com.viscript.npc.npc.NpcAttachmentType;
 import com.viscript.npc.npc.NpcRegister;
+import com.viscript.npc.plugin.IViScriptNpcPlugin;
+import com.viscript.npc.plugin.ViScriptNpcPlugin;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
@@ -19,6 +20,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.slf4j.Logger;
 
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 @Mod(ViScriptNpc.MOD_ID)
@@ -28,10 +30,9 @@ public class ViScriptNpc {
 
     public ViScriptNpc(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
         NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
-        ArgumentRegister.ARGUMENT_TYPE.register(modEventBus);
         NpcRegister.ENTITY_TYPES.register(modEventBus);
         NpcAttachmentType.ATTACHMENT_TYPES.register(modEventBus);
-        SyncAccessor.init();
+        executePluginMethod(IViScriptNpcPlugin::init);
     }
 
     //注册指令
@@ -46,7 +47,7 @@ public class ViScriptNpc {
     }
 
     public static String formattedMod(String path) {
-        return path.formatted(MOD_ID);
+        return ("%s:" + path).formatted(MOD_ID);
     }
 
     public static boolean isPresentResource(ResourceLocation resourceLocation) {
@@ -63,5 +64,18 @@ public class ViScriptNpc {
 
     private static boolean isModLoaded(String modId) {
         return ModList.get().isLoaded(modId);
+    }
+
+    public static void executePluginMethod(Consumer<IViScriptNpcPlugin> consumer) {
+        ReflectionUtils.findAnnotationClasses(ViScriptNpcPlugin.class, data -> true, clazz -> {
+            try {
+                if (clazz.getConstructor().newInstance() instanceof IViScriptNpcPlugin plugin) {
+                    consumer.accept(plugin);
+                }
+            } catch (Throwable throwable) {
+                LOGGER.error("Failed to load plugin {}", clazz.getName(), throwable);
+            }
+        }, () -> {
+        });
     }
 }

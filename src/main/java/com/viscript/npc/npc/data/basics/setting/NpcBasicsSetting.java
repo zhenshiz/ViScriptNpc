@@ -35,6 +35,8 @@ import org.jetbrains.annotations.NotNull;
 public class NpcBasicsSetting implements INpcData {
     public static final StreamCodec<ByteBuf, NpcBasicsSetting> STREAM_CODEC;
     public static final Codec<NpcBasicsSetting> CODEC;
+    @Configurable(name = "npcConfig.npcBasicsSetting.type",tips = "npcConfig.npcBasicsSetting.type.tips")
+    private String type = "";
     @Configurable(name = "npcConfig.npcBasicsSetting.customName")
     private String customName = "ViScript NPC";
     @Configurable(name = "npcConfig.npcBasicsSetting.customSubName")

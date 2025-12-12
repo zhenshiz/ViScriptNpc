@@ -53,7 +53,7 @@ public class NPCPreviewView extends View {
     private boolean isSceneLoaded = false;
 
     public NPCPreviewView(NpcEditor editor) {
-        super(ViScriptNpc.formattedMod("%s.editor.view.preview"), Icons.CAMERA);
+        super(String.format("%s.editor.view.preview", ViScriptNpc.MOD_ID), Icons.CAMERA);
         this.editor = editor;
         customNpc = NpcRegister.CUSTOM_NPC.get().create(level);
 
@@ -122,7 +122,8 @@ public class NPCPreviewView extends View {
                 Entity entity = customNpc.getNpcDynamicModel().getEntity(customNpc);
                 try { // 某些生物的AI会导致奇怪的崩溃
                     if (entity != null) entity.tick();
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         }
 

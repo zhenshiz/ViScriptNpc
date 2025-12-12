@@ -6,7 +6,6 @@ import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.common.util.INBTSerializable;
 
 import javax.annotation.Nullable;
@@ -19,7 +18,7 @@ public class NPC implements INBTSerializable<CompoundTag> {
     public static final String SUFFIX = ".npc";
     @Nullable
     @Setter
-    private ResourceLocation npcLocation;
+    private String path;
     public NpcConfig npcConfig;
 
     public NPC() {

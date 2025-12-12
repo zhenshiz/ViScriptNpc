@@ -18,13 +18,16 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class NpcListView extends View {
     public final NpcEditor editor;
     public final ScrollerView scrollerView = new ScrollerView();
     LocalPlayer player = Minecraft.getInstance().player;
 
     public NpcListView(NpcEditor editor) {
-        super(ViScriptNpc.formattedMod("%s.editor.view.npcList"));
+        super(String.format("%s.editor.view.npcList", ViScriptNpc.MOD_ID));
         this.editor = editor;
         this.scrollerView.layout((layout) -> {
             layout.setWidthPercent(100.0F);
@@ -33,7 +36,7 @@ public class NpcListView extends View {
         this.addChild(new Button().setOnClick(event -> {
             if (editor.getCurrentProject() instanceof NPCProject npcProject) {
                 CompoundTag tag = npcProject.npc.npcConfig.serializeNBT(Platform.getFrozenRegistry());
-                if (npcProject.currentNpcId > 0) tag.putInt("npcId", npcProject.currentNpcId);
+                if (!npcProject.currentNpcType.isEmpty()) tag.putString("npcType", npcProject.currentNpcType);
                 PacketDistributor.sendToServer(new CreateNpc(tag));
             }
         }).setText("生成NPC").layout(layout -> {
@@ -41,9 +44,13 @@ public class NpcListView extends View {
             layout.setHeight(12);
         }));
         if (player != null) {
+            Map<String, CustomNpc> npcMap = new HashMap<>();
             for (var npc : player.level().getEntitiesOfClass(CustomNpc.class, player.getBoundingBox().inflate(20))) {
+                npcMap.put(npc.getNpcType(), npc);
+            }
+            npcMap.forEach((type, npc) -> {
                 UIElement npcElement = new TextElement()
-                        .setText(Component.nullToEmpty(npc.getNpcBasicsSetting().getCustomName() + " " + npc.getId()))
+                        .setText(Component.nullToEmpty(type))
                         .layout((layout) -> {
                             layout.setWidthPercent(100.0F);
                             layout.setHeight(10);
@@ -54,11 +61,11 @@ public class NpcListView extends View {
                             CompoundTag tag = new CompoundTag();
                             npc.saveWithoutId(tag);
                             project.npc.npcConfig.deserializeNBT(Platform.getFrozenRegistry(), tag);
-                            project.currentNpcId = npc.getId();
+                            project.currentNpcType = type;
                             editor.loadProject(project, null);
                         });
-                this.addChild(npcElement);
-            }
+                scrollerView.viewContainer.addChild(npcElement);
+            });
         }
         this.addChild(this.scrollerView);
     }

@@ -12,7 +12,6 @@ import com.lowdragmc.lowdraglib2.editor.ui.menu.FileMenu;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Dialog;
 import com.lowdragmc.lowdraglib2.syncdata.ISubscription;
-import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.gui.edit.npc.NPC;
 import com.viscript.npc.util.npc.NpcHelper;
 import lombok.Getter;
@@ -32,7 +31,7 @@ public class NPCProject implements IProject {
     @Getter
     private final Resources resources;
     public NPC npc = new NPC();
-    public int currentNpcId = -1;
+    public String currentNpcType = "";
 
     // runtime
     //导出npc数据文本按钮
@@ -90,7 +89,7 @@ public class NPCProject implements IProject {
         exportMenuSubscription = editor.fileMenu.registerMenuCreator((tab, menu) ->
                 menu.branch("editor.project.menu.export", m ->
                         m.leaf("editor.project.export_npc", () -> {
-                            Dialog.showFileDialog("editor.project.tips.save_as", new File(LDLib2.getAssetsDir(), "%s/npc/".formatted(ViScriptNpc.MOD_ID)), false,
+                            Dialog.showFileDialog("editor.project.tips.save_as", new File(LDLib2.getAssetsDir(), NpcHelper.NPC_PATH), false,
                                     Dialog.suffixFilter(NPC.SUFFIX), file -> {
                                         if (file != null && !file.isDirectory()) {
                                             if (!file.getName().endsWith(NPC.SUFFIX)) {
@@ -99,7 +98,6 @@ public class NPCProject implements IProject {
                                             try {
                                                 var fileData = npc.serializeNBT(Platform.getFrozenRegistry());
                                                 NbtIo.writeCompressed(fileData, file.toPath());
-                                                NpcHelper.clearCache();
                                             } catch (Exception ignored) {
                                             }
                                         }

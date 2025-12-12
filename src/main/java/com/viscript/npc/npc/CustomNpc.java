@@ -4,9 +4,8 @@ import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.math.Range;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
-import com.viscript.npc.event.NpcEvent;
+import com.viscript.npc.event.neoforge.NpcEvent;
 import com.viscript.npc.gui.edit.data.NpcConfig;
-import com.viscript.npc.npc.ai.mind.MindMachine;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
@@ -15,11 +14,9 @@ import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
 import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
 import com.viscript.npc.npc.data.inventory.LootTableConfig;
 import com.viscript.npc.npc.data.inventory.NpcInventory;
-import com.viscript.npc.npc.data.mod.integrations.ChatBoxConfig;
 import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
+import com.viscript.npc.plugin.RegisterNpcEvent;
 import com.viscript.npc.util.common.StrUtil;
-import com.zhenshiz.chatbox.utils.chatbox.ChatBoxCommandUtil;
-import lombok.Getter;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
@@ -76,11 +73,7 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     private static final Map<Class<? extends INpcData>, AttachmentType<? extends INpcData>> NPC_DATA_ATTACHMENTS = new HashMap<>();
 
     static {
-        putNpcAttachment(NpcBasicsSetting.class,    NpcAttachmentType.NPC_BASICS_SETTING.get());
-        putNpcAttachment(NpcDynamicModel.class,     NpcAttachmentType.NPC_DYNAMIC_MODEL.get());
-        putNpcAttachment(NpcAttributes.class,       NpcAttachmentType.NPC_ATTRIBUTES.get());
-        putNpcAttachment(NpcInventory.class,        NpcAttachmentType.NPC_INVENTORY.get());
-        putNpcAttachment(NpcModIntegrations.class,  NpcAttachmentType.NPC_MOD_INTEGRATIONS.get());
+        ViScriptNpc.executePluginMethod(plugin -> plugin.registerNpc(new RegisterNpcEvent()));
     }
 
     //披风用参数
@@ -93,13 +86,13 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     public float oBob;
     public float bob;
 
-    // MindMachine
-    @Getter
-    MindMachine mind;
+//    // MindMachine
+//    @Getter
+//    MindMachine mind;
 
     public CustomNpc(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
-        mind = new MindMachine(this);
+//        mind = new MindMachine(this);
     }
 
     public static <T extends INpcData> void putNpcAttachment(Class<T> clazz, AttachmentType<T> attachmentType) {
@@ -127,12 +120,13 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
         }
 
         // MindMachine
-        mind.tick();
+//        mind.tick();
         if (level() instanceof ClientLevel) {
             Entity entity = getNpcDynamicModel().getEntity(this);
             try { // 某些生物的AI会导致奇怪的崩溃
                 if (entity != null) entity.tick();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
     }
 
@@ -289,11 +283,6 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (player instanceof ServerPlayer serverPlayer && hand == InteractionHand.MAIN_HAND) {
-            ChatBoxConfig chatBoxConfig = getNpcModIntegrations().getChatBoxConfig();
-            if (ViScriptNpc.isChatBoxLoaded() && chatBoxConfig.isEnabled()) {
-                ChatBoxCommandUtil.serverSkipDialogues(serverPlayer, ResourceLocation.parse(chatBoxConfig.getDialogResourceLocation()), chatBoxConfig.getGroup(), (Integer) chatBoxConfig.getIndex());
-                return InteractionResult.SUCCESS;
-            }
         }
 
         return InteractionResult.PASS;
@@ -382,6 +371,10 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
 
     public NpcInventory getNpcInventory() {
         return this.getData(getNpcAttachment(NpcInventory.class));
+    }
+
+    public String getNpcType() {
+        return this.getNpcBasicsSetting().getType();
     }
 
     private void setAttributeBaseValue(Holder<Attribute> attribute, double value) {

@@ -1,13 +1,8 @@
 package com.viscript.npc.network.s2c;
 
-import com.lowdragmc.lowdraglib2.Platform;
-import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
-import com.lowdragmc.lowdraglib2.gui.ui.ModularUIScreen;
 import com.viscript.npc.ViScriptNpc;
-import com.viscript.npc.test.TestNpcEditor;
-import net.minecraft.client.Minecraft;
+import com.viscript.npc.util.ViScriptNpcClientUtil;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -25,11 +20,7 @@ public record OpenNpcEditor() implements CustomPacketPayload {
     }
 
     public static void execute(OpenNpcEditor payload, IPayloadContext context) {
-        Minecraft minecraft = Minecraft.getInstance();
-        TestNpcEditor testNpcEditor = new TestNpcEditor();
-        ModularUI ui = testNpcEditor.createUI(minecraft.player);
-        if (!Platform.isDevEnv()) ui.shouldCloseOnEsc(false).shouldCloseOnKeyInventory(false);
-        minecraft.setScreen(new ModularUIScreen(ui, Component.empty()));
+        ViScriptNpcClientUtil.openNpcEditor();
     }
 
     @Override

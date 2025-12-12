@@ -8,6 +8,7 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -23,10 +24,13 @@ public record CreateNpc(CompoundTag nbt) implements CustomPacketPayload {
     public static void execute(CreateNpc payload, IPayloadContext context) {
         CompoundTag tag = payload.nbt;
         ServerPlayer player = (ServerPlayer) context.player();
-        if (tag.contains("npcId")) {
-            int npcId = tag.getInt("npcId");
-            Entity entity = player.level().getEntity(npcId);
-            if (entity instanceof CustomNpc npc) npc.readAdditionalSaveData(tag);
+        if (tag.contains("npcType")) {
+            String npcType = tag.getString("npcType");
+            for (Entity entity : ((ServerLevel) player.level()).getEntities().getAll()) {
+                if (entity instanceof CustomNpc npc && npc.getNpcType().equals(npcType)) {
+                    npc.readAdditionalSaveData(tag);
+                }
+            }
         } else {
             CustomNpc npc = NpcRegister.CUSTOM_NPC.get().create(player.level());
             if (npc != null) {

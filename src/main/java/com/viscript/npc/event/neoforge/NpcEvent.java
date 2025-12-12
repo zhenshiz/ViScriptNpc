@@ -1,4 +1,4 @@
-package com.viscript.npc.event;
+package com.viscript.npc.event.neoforge;
 
 import com.viscript.npc.npc.CustomNpc;
 import lombok.Getter;
@@ -57,18 +57,26 @@ public abstract class NpcEvent extends Event {
         }
     }
 
-    @Getter
     public static class Hurt extends NpcEvent implements ICancellableEvent {
+        private final LivingIncomingDamageEvent event;
+        @Getter
         private final DamageSource source;
-        @Setter
-        private float amount;
+        @Getter
         private final DamageContainer container;
 
         public Hurt(LivingIncomingDamageEvent event) {
             super((CustomNpc) event.getEntity());
+            this.event = event;
             this.source = event.getSource();
-            this.amount = event.getAmount();
             this.container = event.getContainer();
+        }
+
+        public float getAmount() {
+            return event.getAmount();
+        }
+
+        public void setAmount(float newDamage) {
+            event.setAmount(newDamage);
         }
     }
 
@@ -90,20 +98,29 @@ public abstract class NpcEvent extends Event {
         }
     }
 
-    @Getter
     public static class Attack extends NpcEvent implements ICancellableEvent {
+        private final LivingIncomingDamageEvent event;
+        @Getter
         private final Entity target;
+        @Getter
         private final DamageSource source;
-        @Setter
-        private float amount;
+        @Getter
         private final DamageContainer container;
 
         public Attack(CustomNpc npc, LivingIncomingDamageEvent event) {
             super(npc);
+            this.event = event;
             this.target = event.getEntity();
             this.source = event.getSource();
-            this.amount = event.getAmount();
             this.container = event.getContainer();
+        }
+
+        public float getAmount() {
+            return event.getAmount();
+        }
+
+        public void setAmount(float newDamage) {
+            event.setAmount(newDamage);
         }
     }
 

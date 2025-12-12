@@ -1,29 +1,48 @@
 package com.viscript.npc.gui.edit.data;
 
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
+import com.lowdragmc.lowdraglib2.editor.ui.sceneeditor.sceneobject.IScene;
+import com.lowdragmc.lowdraglib2.editor.ui.sceneeditor.sceneobject.ISceneObject;
+import com.lowdragmc.lowdraglib2.math.Transform;
 import com.viscript.npc.ViScriptNpc;
-import com.viscript.npc.gui.edit.npc.NpcObject;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.common.StrUtil;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.NotNull;
 
+import javax.annotation.Nullable;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-@EqualsAndHashCode(callSuper = true)
-public class NpcConfig extends NpcObject implements INpcData {
+public class NpcConfig implements INpcData, ISceneObject {
+    public final Transform transform = new Transform(this);
+    @Nullable
+    @Getter
+    private IScene scene;
+
     public static final Set<Class<? extends INpcData>> NPC_DATA_CLASSES = new LinkedHashSet<>();
 
     private final Set<INpcData> npcData = new LinkedHashSet<>();
+
     {
         for (Class<? extends INpcData> npcDataClass : NPC_DATA_CLASSES) {
             try {
                 npcData.add(npcDataClass.getDeclaredConstructor().newInstance());
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
+    }
+
+    @Override
+    public Transform transform() {
+        return this.transform;
+    }
+
+    @Override
+    public void setSceneInternal(IScene scene) {
+        this.scene = scene;
     }
 
     public <T extends INpcData> T getNpcData(Class<T> npcDataClass) {
@@ -40,7 +59,7 @@ public class NpcConfig extends NpcObject implements INpcData {
 
     @Override
     public void buildConfigurator(ConfiguratorGroup father) {
-        super.buildConfigurator(father);
+        INpcData.super.buildConfigurator(father);
         for (INpcData npcData : this.npcData) {
             String name = "npcConfig." + StrUtil.toCamelCase(npcData.getConfigurableName());
             ConfiguratorGroup newGroup = new ConfiguratorGroup(name, true);
@@ -52,7 +71,7 @@ public class NpcConfig extends NpcObject implements INpcData {
 
     @Override
     public CompoundTag serializeNBT(HolderLookup.@NotNull Provider provider) {
-        CompoundTag tag = super.serializeNBT(provider);
+        CompoundTag tag = INpcData.super.serializeNBT(provider);
         for (INpcData npcData : this.npcData) {
             tag.put(StrUtil.toCamelCase(npcData.getConfigurableName()), npcData.serializeNBT(provider));
         }
@@ -61,11 +80,11 @@ public class NpcConfig extends NpcObject implements INpcData {
 
     @Override
     public void deserializeNBT(HolderLookup.@NotNull Provider provider, @NotNull CompoundTag tag) {
-        super.deserializeNBT(provider, tag);
+        INpcData.super.deserializeNBT(provider, tag);
         for (INpcData npcData : this.npcData) {
             var name = StrUtil.toCamelCase(npcData.getConfigurableName());
             if (tag.contains(name)) npcData.deserializeNBT(provider, tag.getCompound(name));
-            // 适用于从生物身上读数据
+                // 适用于从生物身上读数据
             else if (tag.contains("neoforge:attachments")) {
                 npcData.deserializeNBT(provider, tag.getCompound("neoforge:attachments").getCompound(ViScriptNpc.id(StrUtil.toSnakeCase(npcData.getConfigurableName())).toString()));
             }

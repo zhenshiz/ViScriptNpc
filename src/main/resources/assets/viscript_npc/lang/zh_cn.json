@@ -1,6 +1,7 @@
 {
   "command.target.player.only": "此命令的目标对象应该是玩家",
   "command.target.entity.only": "此命令的目标对象应该是实体",
+  "command.viscript_npc.reload": "已重载NPC文件的补全",
 
   "entity.viscript_npc.custom_npc": "NPC",
 
@@ -16,10 +17,10 @@
   "viscript_npc.configurator.item.count": "数量",
   "viscript_npc.selectItemDialog.title": "选择物品",
 
-  "npcObject.name": "项目名",
-  "npcObject.transform": "变换",
-
+  "npcConfig.transform": "变换",
   "npcConfig.npcBasicsSetting": "基础配置",
+  "npcConfig.npcBasicsSetting.type": "标记",
+  "npcConfig.npcBasicsSetting.type.tips": "相同标记的NPC共享同一套逻辑脚本，编辑器保存时会同时修改同一标记的所有NPC",
   "npcConfig.npcBasicsSetting.customName": "名称",
   "npcConfig.npcBasicsSetting.customSubName": "副名称",
   "npcConfig.npcBasicsSetting.nameVisible": "名称显示",
@@ -112,11 +113,5 @@
   "npcConfig.npcInventory.LootTableConfig.count": "物品数量",
   "npcConfig.npcInventory.LootTableConfig.chance": "物品掉落概率",
 
-  "npcConfig.npcModIntegrations": "模组联动配置",
-  "npcConfig.npcModIntegrations.chatBoxConfig": "ChatBox联动配置",
-  "npcConfig.npcModIntegrations.chatBoxConfig.tips": "与实体交互打开对话框",
-  "npcConfig.npcModIntegrations.chatBoxConfig.enabled": "是否启动实体交互打开对话框",
-  "npcConfig.npcModIntegrations.chatBoxConfig.dialogResourceLocation": "对话路径",
-  "npcConfig.npcModIntegrations.chatBoxConfig.group": "组名",
-  "npcConfig.npcModIntegrations.chatBoxConfig.index": "序号"
+  "npcConfig.npcModIntegrations": "模组联动配置"
 }
