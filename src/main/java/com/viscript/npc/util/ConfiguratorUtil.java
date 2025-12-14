@@ -2,6 +2,7 @@ package com.viscript.npc.util;
 
 import com.lowdragmc.lowdraglib2.configurator.ui.SearchComponentConfigurator;
 import com.lowdragmc.lowdraglib2.gui.texture.ItemStackTexture;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
 import com.lowdragmc.lowdraglib2.utils.search.IResultHandler;
 import com.viscript.npc.util.common.BeanUtil;
@@ -46,12 +47,14 @@ public class ConfiguratorUtil {
                     }
                 },
                 value -> BuiltInRegistries.ITEM.getKey(value).toString(),
-                value -> ""
+                value -> {
+                    UIElementProvider<Item> itemUIProvider = UIElementProvider.iconText(
+                            ItemStackTexture::new,
+                            item -> Component.translatable(item.getDescriptionId())
+                    );
+                    return itemUIProvider.createUI(value);
+                }
         );
-        itemSearchComponentConfigurator.searchComponent.setCandidateUIProvider(UIElementProvider.iconText(
-                ItemStackTexture::new,
-                item -> Component.translatable(item.getDescriptionId())
-        ));
         return itemSearchComponentConfigurator;
     }
 
@@ -75,7 +78,7 @@ public class ConfiguratorUtil {
                     }
                 },
                 (value) -> BeanUtil.getValueOrDefault(value, ""),
-                value -> value
+                value -> new Label().setText(value)
         );
     }
 }

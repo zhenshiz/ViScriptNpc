@@ -1,6 +1,5 @@
 package com.viscript.npc.plugin;
 
-import com.viscript.npc.configurator.SyncAccessor;
 import com.viscript.npc.npc.NpcAttachmentType;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
 import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
@@ -12,7 +11,6 @@ import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
 public class NpcPlugin implements IViScriptNpcPlugin {
     @Override
     public void init() {
-        SyncAccessor.init();
     }
 
     @Override

@@ -8,6 +8,8 @@ import com.viscript.npc.mixin.GeoModelAccessor;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.basics.setting.ILiving;
 import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
+import com.viscript.npc.npc.data.dynamic.model.ModelPartConfig;
+import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
 import com.viscript.npc.npc.layer.CapeLayer;
 import com.viscript.npc.npc.layer.INpcAppearancePart;
 import com.viscript.npc.util.common.BeanUtil;
@@ -35,6 +37,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.ClientHooks;
 import org.joml.Matrix4f;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
+import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.renderer.GeoEntityRenderer;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -119,7 +122,7 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
         int color = npc.getNpcBasicsSetting().getSkinColor();
         ((ILiving) npc).setSkinColor(color);
         if (entity == null) {
-            npc.getNpcDynamicModel().updateNpcModelPart(this.model);
+            updateNpcModelPart(npc.getNpcDynamicModel(), this.model);
         } else {
             // 复制所有需要的npc属性给用于渲染的实体
             BeanUtil.copyProperties(npc, entity);
@@ -136,11 +139,11 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
 
             if (render instanceof HumanoidMobRenderer humanoidMobRenderer) { // 修改人形模型参数
                 HumanoidModel rendererModel = (HumanoidModel) humanoidMobRenderer.getModel();
-                npc.getNpcDynamicModel().updateNpcModelPart(rendererModel);
+                updateNpcModelPart(npc.getNpcDynamicModel(), rendererModel);
             } else if (ViScriptNpc.isGeckoLibLoaded() && render instanceof GeoEntityRenderer geoEntityRenderer) {
                 // 修改gecko模型参数
                 BakedGeoModel currentModel = ((GeoModelAccessor) geoEntityRenderer.getGeoModel()).getCurrentModel();
-                if (currentModel != null) npc.getNpcDynamicModel().updateGeoPart(currentModel);
+                if (currentModel != null) updateGeoPart(npc.getNpcDynamicModel(), currentModel);
             } // 直接调用对应实体的渲染方法
             render.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
             entityRender(npc, partialTicks, poseStack, buffer, packedLight);
@@ -171,5 +174,47 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
     @Override
     public ResourceLocation getTextureLocation(T t) {
         return NpcBasicsSetting.SkinType.getSkinType(t.getNpcBasicsSetting());
+    }
+
+    public static void updateNpcModelPart(NpcDynamicModel config, HumanoidModel<?> model) {
+        BeanUtil.copyProperties(config.getHead(), model.head);
+        BeanUtil.copyProperties(config.getBody(), model.body);
+        BeanUtil.copyProperties(config.getArmL(), model.leftArm);
+        BeanUtil.copyProperties(config.getArmR(), model.rightArm);
+        BeanUtil.copyProperties(config.getLegL(), model.leftLeg);
+        BeanUtil.copyProperties(config.getLegR(), model.rightLeg);
+    }
+
+    public static void updateGeoPart(NpcDynamicModel config, BakedGeoModel model) {
+        for (var geoBone : model.topLevelBones()) {
+            if (tryCopyConfig(config, geoBone)) continue;
+            for (var child : geoBone.getChildBones()) {
+                tryCopyConfig(config, child);
+            }
+        }
+    }
+
+    private static boolean tryCopyConfig(NpcDynamicModel config, GeoBone geoBone) {
+        String name = geoBone.getName().toLowerCase();
+        if (name.contains("head")) return copy(config.getHead(), geoBone);
+        if (name.contains("body")) return copy(config.getBody(), geoBone);
+        if (name.contains("left") && (name.contains("arm") || name.contains("hand"))) {
+            return copy(config.getArmL(), geoBone);
+        }
+        if (name.contains("right") && (name.contains("arm") || name.contains("hand"))) {
+            return copy(config.getArmR(), geoBone);
+        }
+        if (name.contains("left") && (name.contains("leg") || name.contains("foot"))) {
+            return copy(config.getLegL(), geoBone);
+        }
+        if (name.contains("right") && (name.contains("leg") || name.contains("foot"))) {
+            return copy(config.getLegR(), geoBone);
+        }
+        return false;
+    }
+
+    private static boolean copy(ModelPartConfig config, GeoBone geoBone) {
+        BeanUtil.copyProperties(config.transform(), geoBone);
+        return true;
     }
 }

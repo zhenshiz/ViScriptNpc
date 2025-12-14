@@ -1,8 +1,6 @@
-package com.viscript.npc.configurator;
+package com.viscript.npc.util;
 
 import com.lowdragmc.lowdraglib2.Platform;
-import com.lowdragmc.lowdraglib2.syncdata.AccessorRegistries;
-import com.lowdragmc.lowdraglib2.syncdata.accessor.direct.CustomDirectAccessor;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.Dynamic;
 import io.netty.buffer.ByteBuf;
@@ -14,7 +12,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.fml.loading.FMLEnvironment;
 
-public class SyncAccessor {
+public class ItemUtil {
     public static final Codec<ItemStack> ITEM_STACK_CODEC = Codec.PASSTHROUGH.xmap(
             dynamic -> {
                 CompoundTag tag = (CompoundTag) dynamic.getValue();
@@ -29,13 +27,4 @@ public class SyncAccessor {
     );
 
     public static final StreamCodec<ByteBuf, ItemStack> ITEM_STACK_STREAM_CODEC = ByteBufCodecs.fromCodec(ITEM_STACK_CODEC);
-
-    public static void init() {
-        AccessorRegistries.registerAccessor(CustomDirectAccessor.builder(ItemStack.class)
-                        .codec(ITEM_STACK_CODEC).streamCodec(ITEM_STACK_STREAM_CODEC)
-                        .customMark(ItemStack::copy, ItemStack::matches)
-                        .build(),
-                0
-        );
-    }
 }

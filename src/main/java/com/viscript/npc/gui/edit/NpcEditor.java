@@ -28,6 +28,11 @@ public class NpcEditor extends Editor {
     }
 
     @Override
+    protected Editor createNewEditorInstance() {
+        return new NpcEditor();
+    }
+
+    @Override
     protected void loadNewProject(IProject project, @Nullable File projectFile) {
         System.out.println(project.getResources().resources);
         if (project instanceof NPCProject npcProject) {

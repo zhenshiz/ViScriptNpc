@@ -3,15 +3,16 @@ package com.viscript.npc.gui.edit;
 import com.lowdragmc.lowdraglib2.LDLib2;
 import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.editor.project.IProject;
+import com.lowdragmc.lowdraglib2.editor.project.ProjectType;
 import com.lowdragmc.lowdraglib2.editor.resource.ColorsResource;
 import com.lowdragmc.lowdraglib2.editor.resource.IRendererResource;
 import com.lowdragmc.lowdraglib2.editor.resource.Resources;
 import com.lowdragmc.lowdraglib2.editor.resource.TexturesResource;
 import com.lowdragmc.lowdraglib2.editor.ui.Editor;
-import com.lowdragmc.lowdraglib2.editor.ui.menu.FileMenu;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Dialog;
 import com.lowdragmc.lowdraglib2.syncdata.ISubscription;
+import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.gui.edit.npc.NPC;
 import com.viscript.npc.util.npc.NpcHelper;
 import lombok.Getter;
@@ -26,7 +27,7 @@ import java.io.File;
 
 public class NPCProject implements IProject {
     public static int VERSION = 1;
-    public static final FileMenu.ProjectProvider PROVIDER = FileMenu.ProjectProvider.of(IGuiTexture.EMPTY, Component.translatable("editor.project.npc.add").getString(), ".npcproj", NPCProject::new);
+    public static final ProjectType PROVIDER = ProjectType.of(IGuiTexture.EMPTY, Component.translatable("editor.project.npc.add").getString(), ".npcproj", NPCProject::new);
 
     @Getter
     private final Resources resources;
@@ -52,13 +53,8 @@ public class NPCProject implements IProject {
     }
 
     @Override
-    public String getSuffix() {
-        return PROVIDER.suffix;
-    }
-
-    @Override
-    public String getName() {
-        return PROVIDER.name;
+    public ProjectType getProjectType() {
+        return PROVIDER;
     }
 
     @Override
@@ -89,7 +85,7 @@ public class NPCProject implements IProject {
         exportMenuSubscription = editor.fileMenu.registerMenuCreator((tab, menu) ->
                 menu.branch("editor.project.menu.export", m ->
                         m.leaf("editor.project.export_npc", () -> {
-                            Dialog.showFileDialog("editor.project.tips.save_as", new File(LDLib2.getAssetsDir(), NpcHelper.NPC_PATH), false,
+                            Dialog.showFileDialog("editor.project.tips.save_as", new File(LDLib2.getAssetsDir(), "%s/npc/".formatted(ViScriptNpc.MOD_ID)), false,
                                     Dialog.suffixFilter(NPC.SUFFIX), file -> {
                                         if (file != null && !file.isDirectory()) {
                                             if (!file.getName().endsWith(NPC.SUFFIX)) {
@@ -98,6 +94,7 @@ public class NPCProject implements IProject {
                                             try {
                                                 var fileData = npc.serializeNBT(Platform.getFrozenRegistry());
                                                 NbtIo.writeCompressed(fileData, file.toPath());
+                                                NpcHelper.clearCache();
                                             } catch (Exception ignored) {
                                             }
                                         }

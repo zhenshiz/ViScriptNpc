@@ -7,16 +7,16 @@ import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextElement;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
+import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.gui.edit.NPCProject;
 import com.viscript.npc.gui.edit.NpcEditor;
-import com.viscript.npc.network.c2s.CreateNpc;
+import com.viscript.npc.network.c2s.C2SPayload;
 import com.viscript.npc.npc.CustomNpc;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -37,7 +37,7 @@ public class NpcListView extends View {
             if (editor.getCurrentProject() instanceof NPCProject npcProject) {
                 CompoundTag tag = npcProject.npc.npcConfig.serializeNBT(Platform.getFrozenRegistry());
                 if (!npcProject.currentNpcType.isEmpty()) tag.putString("npcType", npcProject.currentNpcType);
-                PacketDistributor.sendToServer(new CreateNpc(tag));
+                RPCPacketDistributor.rpcToAllPlayers(C2SPayload.CREATE_NPC, tag);
             }
         }).setText("生成NPC").layout(layout -> {
             layout.setWidthPercent(50.0F);

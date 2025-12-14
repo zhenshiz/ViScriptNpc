@@ -1,7 +1,6 @@
 {
   "command.target.player.only": "此命令的目标对象应该是玩家",
   "command.target.entity.only": "此命令的目标对象应该是实体",
-  "command.viscript_npc.reload": "已重载NPC文件的补全",
 
   "entity.viscript_npc.custom_npc": "NPC",
 

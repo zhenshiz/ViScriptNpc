@@ -2,8 +2,8 @@ package com.viscript.npc.util;
 
 import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.editor.ui.EditorWindow;
+import com.lowdragmc.lowdraglib2.gui.holder.ModularUIScreen;
 import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
-import com.lowdragmc.lowdraglib2.gui.ui.ModularUIScreen;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.util.npc.NpcHelper;
@@ -17,7 +17,7 @@ public class ViScriptNpcClientUtil {
     public static void openNpcEditor() {
         Minecraft minecraft = Minecraft.getInstance();
         EditorWindow editorWindow = new EditorWindow(NpcEditor::new);
-        ModularUI ui = new ModularUI(UI.of(editorWindow, (size) -> size));
+        ModularUI ui = new ModularUI(UI.of(editorWindow));
         if (!Platform.isDevEnv()) ui.shouldCloseOnEsc(false).shouldCloseOnKeyInventory(false);
         minecraft.setScreen(new ModularUIScreen(ui, Component.empty()));
         if (NpcHelper.cacheNpcProject != null && editorWindow.getCurrentEditor() != null) {

@@ -45,7 +45,7 @@ public class MeleeConfig implements INpcData {
     @ConfigSelector(subConfiguratorBuilder = "additionalEffectsSubConfiguratorBuilder")
     private AdditionalEffects additionalEffects = AdditionalEffects.NONE;
     @Persisted
-    private String debuffEffect = MobEffects.SLOW_FALLING.getRegisteredName() ;
+    private String debuffEffect = MobEffects.SLOW_FALLING.getRegisteredName();
     @Persisted
     private Number seconds = 0;
     @Persisted
@@ -98,12 +98,14 @@ public class MeleeConfig implements INpcData {
                     }
                     return "";
                 },
-                value -> ""
+                value -> {
+                    UIElementProvider<MobEffect> mobEffectUIElementProvider = UIElementProvider.iconText(
+                            MobEffectTexture::new,
+                            effect -> Component.translatable(effect.getDescriptionId())
+                    );
+                    return mobEffectUIElementProvider.createUI(value);
+                }
         );
-        mobEffectSearchComponentConfigurator.searchComponent.setCandidateUIProvider(UIElementProvider.iconText(
-                MobEffectTexture::new,
-                effect -> Component.translatable(effect.getDescriptionId())
-        ));
         mobEffectSearchComponentConfigurator.setTips("npcConfig.npcAttributes.meleeConfig.debuffEffect.tips");
         return mobEffectSearchComponentConfigurator;
     }

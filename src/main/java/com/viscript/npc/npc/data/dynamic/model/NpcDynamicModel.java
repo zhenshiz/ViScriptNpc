@@ -17,7 +17,6 @@ import io.netty.buffer.ByteBuf;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.TagParser;
@@ -28,8 +27,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.phys.AABB;
-import software.bernie.geckolib.cache.object.BakedGeoModel;
-import software.bernie.geckolib.cache.object.GeoBone;
 
 import java.util.stream.Collectors;
 
@@ -96,48 +93,6 @@ public class NpcDynamicModel implements INpcData {
         }
         if (entity != null) entity.load(tagFromString(nbt));
         return this.entity;
-    }
-
-    public void updateNpcModelPart(HumanoidModel<?> model) {
-        BeanUtil.copyProperties(this.head, model.head);
-        BeanUtil.copyProperties(this.body, model.body);
-        BeanUtil.copyProperties(this.armL, model.leftArm);
-        BeanUtil.copyProperties(this.armR, model.rightArm);
-        BeanUtil.copyProperties(this.legL, model.leftLeg);
-        BeanUtil.copyProperties(this.legR, model.rightLeg);
-    }
-
-    public void updateGeoPart(BakedGeoModel model) {
-        for (var geoBone : model.topLevelBones()) {
-            if (tryCopyConfig(geoBone)) continue;
-            for (var child : geoBone.getChildBones()) {
-                tryCopyConfig(child);
-            }
-        }
-    }
-
-    private boolean tryCopyConfig(GeoBone geoBone) {
-        String name = geoBone.getName().toLowerCase();
-        if (name.contains("head")) return copy(head, geoBone);
-        if (name.contains("body")) return copy(body, geoBone);
-        if (name.contains("left") && (name.contains("arm") || name.contains("hand"))) {
-            return copy(armL, geoBone);
-        }
-        if (name.contains("right") && (name.contains("arm") || name.contains("hand"))) {
-            return copy(armR, geoBone);
-        }
-        if (name.contains("left") && (name.contains("leg") || name.contains("foot"))) {
-            return copy(legL, geoBone);
-        }
-        if (name.contains("right") && (name.contains("leg") || name.contains("foot"))) {
-            return copy(legR, geoBone);
-        }
-        return false;
-    }
-
-    private boolean copy(ModelPartConfig config, GeoBone geoBone) {
-        BeanUtil.copyProperties(config.transform(), geoBone);
-        return true;
     }
 
     @Override
