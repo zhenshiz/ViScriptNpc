@@ -18,8 +18,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import net.minecraft.client.resources.DefaultPlayerSkin;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
@@ -53,7 +51,7 @@ public class NpcBasicsSetting implements INpcData {
     @ConfigSelector(subConfiguratorBuilder = "skinTypeSubConfiguratorBuilder")
     private SkinType skinType = SkinType.RESOURCE_PACK;
     @Persisted
-    private String textureLocation = DefaultPlayerSkin.getDefaultTexture().toString();
+    private String textureLocation = "textures/entity/player/slim/steve.png";
     @Persisted
     private String texturePlayerName = "";
     @Configurable(name = "npcConfig.npcBasicsSetting.capeTexture", tips = "npcConfig.npcBasicsSetting.capeTexture.tips")
@@ -83,8 +81,8 @@ public class NpcBasicsSetting implements INpcData {
     @Getter
     @AllArgsConstructor
     public enum SkinType implements StringRepresentable {
-        RESOURCE_PACK(Component.translatable("npcConfig.npcBasicsSetting.skinType.resourcePack").getString()),
-        PLAYER_NAME(Component.translatable("npcConfig.npcBasicsSetting.skinType.playerName").getString());
+        RESOURCE_PACK("resourcePack"),
+        PLAYER_NAME("playerName");
 
         private final String name;
 

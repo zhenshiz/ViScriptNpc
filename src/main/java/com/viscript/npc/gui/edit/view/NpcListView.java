@@ -36,8 +36,8 @@ public class NpcListView extends View {
         this.addChild(new Button().setOnClick(event -> {
             if (editor.getCurrentProject() instanceof NPCProject npcProject) {
                 CompoundTag tag = npcProject.npc.npcConfig.serializeNBT(Platform.getFrozenRegistry());
-                if (!npcProject.currentNpcType.isEmpty()) tag.putString("npcType", npcProject.currentNpcType);
-                RPCPacketDistributor.rpcToAllPlayers(C2SPayload.CREATE_NPC, tag);
+                tag.putString("npcType", npcProject.getCurrentNpcType());
+                RPCPacketDistributor.rpcToServer(C2SPayload.CREATE_NPC, tag);
             }
         }).setText("生成NPC").layout(layout -> {
             layout.setWidthPercent(50.0F);
@@ -61,7 +61,6 @@ public class NpcListView extends View {
                             CompoundTag tag = new CompoundTag();
                             npc.saveWithoutId(tag);
                             project.npc.npcConfig.deserializeNBT(Platform.getFrozenRegistry(), tag);
-                            project.currentNpcType = type;
                             editor.loadProject(project, null);
                         });
                 scrollerView.viewContainer.addChild(npcElement);

@@ -2,7 +2,6 @@ package com.viscript.npc;
 
 import com.lowdragmc.lowdraglib2.utils.ReflectionUtils;
 import com.mojang.logging.LogUtils;
-import com.viscript.npc.command.argument.ArgumentRegister;
 import com.viscript.npc.npc.NpcAttachmentType;
 import com.viscript.npc.npc.NpcRegister;
 import com.viscript.npc.plugin.IViScriptNpcPlugin;
@@ -28,7 +27,6 @@ public class ViScriptNpc {
     public ViScriptNpc(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
         NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
         NpcRegister.ENTITY_TYPES.register(modEventBus);
-        ArgumentRegister.ARGUMENT_TYPE.register(modEventBus);
         NpcAttachmentType.ATTACHMENT_TYPES.register(modEventBus);
         executePluginMethod(IViScriptNpcPlugin::init);
     }

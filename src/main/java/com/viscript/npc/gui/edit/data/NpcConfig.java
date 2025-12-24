@@ -1,30 +1,20 @@
 package com.viscript.npc.gui.edit.data;
 
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
-import com.lowdragmc.lowdraglib2.editor.ui.sceneeditor.sceneobject.IScene;
-import com.lowdragmc.lowdraglib2.editor.ui.sceneeditor.sceneobject.ISceneObject;
-import com.lowdragmc.lowdraglib2.math.Transform;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.common.StrUtil;
-import lombok.Getter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.NotNull;
 
-import javax.annotation.Nullable;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-public class NpcConfig implements INpcData, ISceneObject {
-    public final Transform transform = new Transform(this);
-    @Nullable
-    @Getter
-    private IScene scene;
-
+public class NpcConfig implements INpcData {
     public static final Set<Class<? extends INpcData>> NPC_DATA_CLASSES = new LinkedHashSet<>();
 
-    private final Set<INpcData> npcData = new LinkedHashSet<>();
+    final Set<INpcData> npcData = new LinkedHashSet<>();
 
     {
         for (Class<? extends INpcData> npcDataClass : NPC_DATA_CLASSES) {
@@ -33,16 +23,6 @@ public class NpcConfig implements INpcData, ISceneObject {
             } catch (Exception ignored) {
             }
         }
-    }
-
-    @Override
-    public Transform transform() {
-        return this.transform;
-    }
-
-    @Override
-    public void setSceneInternal(IScene scene) {
-        this.scene = scene;
     }
 
     public <T extends INpcData> T getNpcData(Class<T> npcDataClass) {

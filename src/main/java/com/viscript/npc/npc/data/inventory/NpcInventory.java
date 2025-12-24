@@ -1,6 +1,5 @@
 package com.viscript.npc.npc.data.inventory;
 
-import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber.Type;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigSelector;
@@ -13,7 +12,6 @@ import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.ReadOnlyManaged;
 import com.lowdragmc.lowdraglib2.utils.PersistedParser;
 import com.mojang.serialization.Codec;
-import com.viscript.npc.configurator.annotation.ConfigItemStack;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.ConfiguratorUtil;
 import io.netty.buffer.ByteBuf;
@@ -21,19 +19,16 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.IntTag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Data
 @AllArgsConstructor
@@ -44,13 +39,10 @@ public class NpcInventory implements INpcData {
     @Configurable(name = "npcConfig.npcInventory.helmet")
     private ItemStack helmet = ItemStack.EMPTY;
     @Configurable(name = "npcConfig.npcInventory.chestplate")
-    @ConfigItemStack(tag = "chest_armor")
     private ItemStack chestplate = ItemStack.EMPTY;
     @Configurable(name = "npcConfig.npcInventory.leggings")
-    @ConfigItemStack(tag = "leg_armor")
     private ItemStack leggings = ItemStack.EMPTY;
     @Configurable(name = "npcConfig.npcInventory.boots")
-    @ConfigItemStack(tag = "foot_armor")
     private ItemStack boots = ItemStack.EMPTY;
     @Configurable(name = "npcConfig.npcInventory.mainHand")
     private ItemStack mainHand = ItemStack.EMPTY;
@@ -76,8 +68,9 @@ public class NpcInventory implements INpcData {
     private void LootTableTypeSubConfiguratorBuilder(LootTableType value, ConfiguratorGroup group) {
         switch (value) {
             case DATAPACK -> {
-                group.addConfigurator(ConfiguratorUtil.createStrArrSearchComponentConfigurator("npcConfig.npcInventory.lootTable",
-                        Platform.getMinecraftServer().reloadableRegistries().getKeys(Registries.LOOT_TABLE).stream().map(ResourceLocation::toString).collect(Collectors.toSet()),
+                group.addConfigurator(ConfiguratorUtil.createStrArrSearchComponentConfigurator("npcConfig.npcInventory.lootTable", new HashSet<>(),
+                        //todo 同步服务端 loot table？
+                        //Platform.getMinecraftServer().reloadableRegistries().getKeys(Registries.LOOT_TABLE).stream().map(ResourceLocation::toString).collect(Collectors.toSet()),
                         this::getLootTable,
                         this::setLootTable)
                 );
@@ -115,8 +108,8 @@ public class NpcInventory implements INpcData {
     @Getter
     @AllArgsConstructor
     public enum LootTableType implements StringRepresentable {
-        DATAPACK(Component.translatable("npcConfig.npcInventory.lootTableType.datapack").getString()),
-        CUSTOM(Component.translatable("npcConfig.npcInventory.lootTableType.custom").getString());
+        DATAPACK("datapack"),
+        CUSTOM("custom");
 
         private final String name;
 

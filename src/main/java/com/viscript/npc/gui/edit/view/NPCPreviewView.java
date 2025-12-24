@@ -19,6 +19,7 @@ import com.viscript.npc.gui.edit.NPCProject;
 import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.gui.edit.components.SceneToggleBuilder;
 import com.viscript.npc.gui.edit.data.NpcConfig;
+import com.viscript.npc.gui.edit.data.ClientNpcConfig;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.NpcRegister;
 import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
@@ -86,7 +87,7 @@ public class NPCPreviewView extends View {
         level.addEntity(customNpc);
         sceneEditor.scene.setRenderedCore(level.getFilledBlocks().longStream().mapToObj(BlockPos::of).toList());
         if (editor.getCurrentProject() instanceof NPCProject npcProject) {
-            NpcConfig npcConfig = npcProject.npc.npcConfig;
+            ClientNpcConfig npcConfig = new ClientNpcConfig(npcProject.npc.npcConfig);
             AABB aabb = npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
             npcConfig.transform.scale(new Vector3f((float) aabb.getXsize(), (float) aabb.getYsize(), (float) aabb.getZsize()));
 
@@ -136,7 +137,7 @@ public class NPCPreviewView extends View {
                 customNpc.readAdditionalSaveData(configTag);
 
                 AABB aabb = npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
-                npcConfig.transform.scale(new Vector3f((float) aabb.getXsize(), (float) aabb.getYsize(), (float) aabb.getZsize()));
+                new ClientNpcConfig(npcConfig).transform.scale(new Vector3f((float) aabb.getXsize(), (float) aabb.getYsize(), (float) aabb.getZsize()));
             }
 
             if (sceneView().cullBoxVisible && sceneView().editor.getCurrentProject() instanceof NPCProject npcProject) {

@@ -1,27 +1,44 @@
 package com.viscript.npc.util;
 
 import com.lowdragmc.lowdraglib2.Platform;
+import com.lowdragmc.lowdraglib2.editor.ui.Editor;
 import com.lowdragmc.lowdraglib2.editor.ui.EditorWindow;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIScreen;
 import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
+import com.viscript.npc.gui.edit.NPCProject;
 import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.util.npc.NpcHelper;
 import dev.latvian.mods.kubejs.typings.Info;
 import net.minecraft.client.Minecraft;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 public class ViScriptNpcClientUtil {
 
     @Info("客户端打开NPC编辑器")
-    public static void openNpcEditor() {
+    public static void openNpcEditor(@Nullable CompoundTag tag) {
         Minecraft minecraft = Minecraft.getInstance();
         EditorWindow editorWindow = new EditorWindow(NpcEditor::new);
         ModularUI ui = new ModularUI(UI.of(editorWindow));
-        if (!Platform.isDevEnv()) ui.shouldCloseOnEsc(false).shouldCloseOnKeyInventory(false);
+        ui.shouldCloseOnKeyInventory(false);
         minecraft.setScreen(new ModularUIScreen(ui, Component.empty()));
-        if (NpcHelper.cacheNpcProject != null && editorWindow.getCurrentEditor() != null) {
-            editorWindow.getCurrentEditor().loadProject(NpcHelper.cacheNpcProject, null);
+
+        Editor editor = editorWindow.getCurrentEditor();
+        if (editor == null) return;
+        if (tag != null && !tag.isEmpty()) {
+            var project = (NPCProject) NPCProject.PROVIDER.projectCreator.get();
+            project.initNewProject();
+            try {
+                project.npc.deserializeNBT(Platform.getFrozenRegistry(), tag);
+                editor.loadProject(project, null);
+                return;
+            } catch (Exception ignored) {
+            }
+        }
+        if (NpcHelper.cacheNpcProject != null) {
+            editor.loadProject(NpcHelper.cacheNpcProject, null);
         }
     }
 }

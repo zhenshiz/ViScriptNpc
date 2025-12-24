@@ -7,6 +7,7 @@
   "editor.project.npc.add": "NPC项目",
   "editor.project.menu.export": "导出",
   "editor.project.export_npc": "导出NPC文件",
+  "editor.project.upload_npc": "上传NPC文件",
   "editor.project.tips.save_as": "另存为",
 
   "viscript_npc.editor.view.npcList": "NPC信息",

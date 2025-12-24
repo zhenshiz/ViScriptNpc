@@ -17,7 +17,6 @@ import com.viscript.npc.npc.data.inventory.NpcInventory;
 import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
 import com.viscript.npc.plugin.RegisterNpcEvent;
 import com.viscript.npc.util.common.StrUtil;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -121,7 +120,7 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
 
         // MindMachine
 //        mind.tick();
-        if (level() instanceof ClientLevel) {
+        if (level().isClientSide()) {
             Entity entity = getNpcDynamicModel().getEntity(this);
             try { // 某些生物的AI会导致奇怪的崩溃
                 if (entity != null) entity.tick();

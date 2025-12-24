@@ -11,9 +11,12 @@ import com.lowdragmc.lowdraglib2.editor.resource.TexturesResource;
 import com.lowdragmc.lowdraglib2.editor.ui.Editor;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Dialog;
+import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
 import com.lowdragmc.lowdraglib2.syncdata.ISubscription;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.gui.edit.npc.NPC;
+import com.viscript.npc.network.c2s.C2SPayload;
+import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
 import com.viscript.npc.util.npc.NpcHelper;
 import lombok.Getter;
 import net.minecraft.core.HolderLookup;
@@ -32,7 +35,7 @@ public class NPCProject implements IProject {
     @Getter
     private final Resources resources;
     public NPC npc = new NPC();
-    public String currentNpcType = "";
+    public String getCurrentNpcType() {return npc.npcConfig.getNpcData(NpcBasicsSetting.class).getType();}
 
     // runtime
     //导出npc数据文本按钮
@@ -83,9 +86,8 @@ public class NPCProject implements IProject {
             exportMenuSubscription.unsubscribe();
         }
         exportMenuSubscription = editor.fileMenu.registerMenuCreator((tab, menu) ->
-                menu.branch("editor.project.menu.export", m ->
-                        m.leaf("editor.project.export_npc", () -> {
-                            Dialog.showFileDialog("editor.project.tips.save_as", new File(LDLib2.getAssetsDir(), "%s/npc/".formatted(ViScriptNpc.MOD_ID)), false,
+                menu.branch("editor.project.menu.export", m -> {
+                            m.leaf("editor.project.export_npc", () -> Dialog.showFileDialog("editor.project.tips.save_as", new File(LDLib2.getAssetsDir(), "%s/npc/".formatted(ViScriptNpc.MOD_ID)), false,
                                     Dialog.suffixFilter(NPC.SUFFIX), file -> {
                                         if (file != null && !file.isDirectory()) {
                                             if (!file.getName().endsWith(NPC.SUFFIX)) {
@@ -98,8 +100,16 @@ public class NPCProject implements IProject {
                                             } catch (Exception ignored) {
                                             }
                                         }
-                                    }).show(editor);
-                        })
+                                    }).show(editor));
+                            m.leaf("editor.project.upload_npc", () -> {
+                                if (getCurrentNpcType().isEmpty()) Dialog.showNotification("上传文件失败", "npc标记（作为文件名）不能为空！", null).show(editor);
+                                else {
+                                    var fileData = npc.serializeNBT(Platform.getFrozenRegistry());
+                                    fileData.putString("fileName", getCurrentNpcType());
+                                    RPCPacketDistributor.rpcToServer(C2SPayload.UPLOAD_NPC_FILE, fileData);
+                                }
+                            });
+                        }
                 ));
     }
 

@@ -22,7 +22,6 @@ public class NpcEditor extends Editor {
     public final NPCPreviewView npcPreviewView = new NPCPreviewView(this);
 
     public NpcEditor() {
-        super();
         fileMenu.addProjectProvider(NPCProject.PROVIDER);
         this.icon.style(style -> style.backgroundTexture(ICON));
     }
