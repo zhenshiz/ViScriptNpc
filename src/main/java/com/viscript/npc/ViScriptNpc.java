@@ -54,10 +54,6 @@ public class ViScriptNpc {
         return isModLoaded("chatbox");
     }
 
-    public static boolean isGeckoLibLoaded() {
-        return isModLoaded("geckolib");
-    }
-
     private static boolean isModLoaded(String modId) {
         return ModList.get().isLoaded(modId);
     }

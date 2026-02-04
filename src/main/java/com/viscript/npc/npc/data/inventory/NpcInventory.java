@@ -12,6 +12,7 @@ import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.ReadOnlyManaged;
 import com.lowdragmc.lowdraglib2.utils.PersistedParser;
 import com.mojang.serialization.Codec;
+import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.ConfiguratorUtil;
 import io.netty.buffer.ByteBuf;
@@ -67,14 +68,9 @@ public class NpcInventory implements INpcData {
 
     private void LootTableTypeSubConfiguratorBuilder(LootTableType value, ConfiguratorGroup group) {
         switch (value) {
-            case DATAPACK -> {
-                group.addConfigurator(ConfiguratorUtil.createStrArrSearchComponentConfigurator("npcConfig.npcInventory.lootTable", new HashSet<>(),
-                        //todo 同步服务端 loot table？
-                        //Platform.getMinecraftServer().reloadableRegistries().getKeys(Registries.LOOT_TABLE).stream().map(ResourceLocation::toString).collect(Collectors.toSet()),
-                        this::getLootTable,
-                        this::setLootTable)
-                );
-            }
+            case DATAPACK -> group.addConfigurator(ConfiguratorUtil.createStrArrSearchComponentConfigurator("npcConfig.npcInventory.lootTable", new HashSet<>(CustomNpc.lootTableKeys),
+                    this::getLootTable, this::setLootTable)
+            );
             case CUSTOM -> {
                 ArrayConfiguratorGroup<LootTableConfig> lootTableConfigArrayConfiguratorGroup = new ArrayConfiguratorGroup<>("npcConfig.npcInventory.lootTables", false,
                         () -> new ArrayList<>(this.getLootTables()),
@@ -108,8 +104,8 @@ public class NpcInventory implements INpcData {
     @Getter
     @AllArgsConstructor
     public enum LootTableType implements StringRepresentable {
-        DATAPACK("datapack"),
-        CUSTOM("custom");
+        DATAPACK("npcConfig.npcInventory.lootTableType.datapack"),
+        CUSTOM("npcConfig.npcInventory.lootTableType.custom");
 
         private final String name;
 

@@ -8,7 +8,6 @@ import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.viscript.npc.gui.edit.NPCProject;
 import com.viscript.npc.gui.edit.NpcEditor;
-import com.viscript.npc.util.npc.NpcHelper;
 import dev.latvian.mods.kubejs.typings.Info;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
@@ -16,6 +15,7 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 public class ViScriptNpcClientUtil {
+    public static NPCProject cacheNpcProject;
 
     @Info("客户端打开NPC编辑器")
     public static void openNpcEditor(@Nullable CompoundTag tag) {
@@ -37,8 +37,8 @@ public class ViScriptNpcClientUtil {
             } catch (Exception ignored) {
             }
         }
-        if (NpcHelper.cacheNpcProject != null) {
-            editor.loadProject(NpcHelper.cacheNpcProject, null);
+        if (cacheNpcProject != null) {
+            editor.loadProject(cacheNpcProject, null);
         }
     }
 }

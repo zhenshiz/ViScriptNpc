@@ -52,8 +52,7 @@ public class MobEffectTexture extends TransformTexture {
     }
 
     @OnlyIn(Dist.CLIENT)
-    protected void drawInternal(GuiGraphics graphics, int mouseX, int mouseY,
-                                float x, float y, float width, float height, float partialTicks) {
+    protected void drawInternal(GuiGraphics graphics, float mouseX, float mouseY, float x, float y, float width, float height, float partialTicks) {
         if (this.mobEffects == null || this.mobEffects.length == 0) return;
 
         this.updateTick();

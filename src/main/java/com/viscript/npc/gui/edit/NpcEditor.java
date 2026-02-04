@@ -7,7 +7,7 @@ import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.gui.edit.view.NPCPreviewView;
 import com.viscript.npc.gui.edit.view.NpcListView;
-import com.viscript.npc.util.npc.NpcHelper;
+import com.viscript.npc.util.ViScriptNpcClientUtil;
 import org.jetbrains.annotations.Nullable;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -36,7 +36,7 @@ public class NpcEditor extends Editor {
         System.out.println(project.getResources().resources);
         if (project instanceof NPCProject npcProject) {
             super.loadNewProject(project, projectFile);
-            NpcHelper.cacheNpcProject = npcProject;
+            ViScriptNpcClientUtil.cacheNpcProject = npcProject;
             this.leftWindow.getLeftTop().addView(npcListView);
             this.centerWindow.getLeftTop().addView(npcPreviewView);
             inspectorView.inspect(npcProject.npc.npcConfig);

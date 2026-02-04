@@ -3,10 +3,8 @@ package com.viscript.npc.npc.render;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.viscript.npc.ViScriptNpc;
-import com.viscript.npc.mixin.GeoModelAccessor;
 import com.viscript.npc.npc.CustomNpc;
-import com.viscript.npc.npc.data.basics.setting.ILiving;
+import com.viscript.npc.npc.data.basics.setting.INpcRenderer;
 import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
 import com.viscript.npc.npc.data.dynamic.model.ModelPartConfig;
 import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
@@ -17,10 +15,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
-import net.minecraft.client.renderer.entity.HumanoidMobRenderer;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.layers.CustomHeadLayer;
 import net.minecraft.client.renderer.entity.layers.ElytraLayer;
@@ -35,14 +33,14 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.ClientHooks;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
 import software.bernie.geckolib.cache.object.GeoBone;
-import software.bernie.geckolib.renderer.GeoEntityRenderer;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
-@SuppressWarnings({"rawtypes"})
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> extends LivingEntityRenderer<T, M> {
@@ -120,14 +118,10 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
     public void render(T npc, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         Entity entity = npc.getNpcDynamicModel().getEntity(npc);
         int color = npc.getNpcBasicsSetting().getSkinColor();
-        ((ILiving) npc).setSkinColor(color);
-        if (entity == null) {
-            updateNpcModelPart(npc.getNpcDynamicModel(), this.model);
-        } else {
+        if (entity != null) {
             // 复制所有需要的npc属性给用于渲染的实体
             BeanUtil.copyProperties(npc, entity);
             if (entity instanceof LivingEntity livingEntity) {
-                ((ILiving) entity).setSkinColor(color);
                 for (EquipmentSlot value : EquipmentSlot.values()) {
                     livingEntity.setItemSlot(value, npc.getItemBySlot(value));
                 }
@@ -137,14 +131,11 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
 
             EntityRenderer<? super Entity> render = this.entityRenderDispatcher.getRenderer(entity);
 
-            if (render instanceof HumanoidMobRenderer humanoidMobRenderer) { // 修改人形模型参数
-                HumanoidModel rendererModel = (HumanoidModel) humanoidMobRenderer.getModel();
-                updateNpcModelPart(npc.getNpcDynamicModel(), rendererModel);
-            } else if (ViScriptNpc.isGeckoLibLoaded() && render instanceof GeoEntityRenderer geoEntityRenderer) {
-                // 修改gecko模型参数
-                BakedGeoModel currentModel = ((GeoModelAccessor) geoEntityRenderer.getGeoModel()).getCurrentModel();
-                if (currentModel != null) updateGeoPart(npc.getNpcDynamicModel(), currentModel);
-            } // 直接调用对应实体的渲染方法
+            if (render instanceof INpcRenderer iRenderer) {
+                iRenderer.setSkinColor(color);
+                iRenderer.setDynamicModel(npc.getNpcDynamicModel());
+            }
+            // 直接调用对应实体的渲染方法
             render.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
             entityRender(npc, partialTicks, poseStack, buffer, packedLight);
             return;
@@ -154,6 +145,10 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
             if (layer instanceof INpcAppearancePart part) {
                 part.preRender(npc);
             }
+        }
+        if (this instanceof INpcRenderer iRenderer) {
+            iRenderer.setSkinColor(color);
+            iRenderer.setDynamicModel(npc.getNpcDynamicModel());
         }
         super.render(npc, entityYaw, partialTicks, poseStack, buffer, packedLight);
         RenderSystem.setShaderColor(1, 1, 1, 1);
@@ -176,45 +171,70 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
         return NpcBasicsSetting.SkinType.getSkinType(t.getNpcBasicsSetting());
     }
 
-    public static void updateNpcModelPart(NpcDynamicModel config, HumanoidModel<?> model) {
-        BeanUtil.copyProperties(config.getHead(), model.head);
-        BeanUtil.copyProperties(config.getBody(), model.body);
-        BeanUtil.copyProperties(config.getArmL(), model.leftArm);
-        BeanUtil.copyProperties(config.getArmR(), model.rightArm);
-        BeanUtil.copyProperties(config.getLegL(), model.leftLeg);
-        BeanUtil.copyProperties(config.getLegR(), model.rightLeg);
+    public static void updateNpcModelPart(@Nullable NpcDynamicModel config, HumanoidModel<?> model, boolean restore) {
+        if (config == null) return;
+        applyPartConfig(config.getHead(), model.head, restore);
+        applyPartConfig(config.getBody(), model.body, restore);
+        applyPartConfig(config.getArmL(), model.leftArm, restore);
+        applyPartConfig(config.getArmR(), model.rightArm, restore);
+        applyPartConfig(config.getLegL(), model.leftLeg, restore);
+        applyPartConfig(config.getLegR(), model.rightLeg, restore);
     }
 
-    public static void updateGeoPart(NpcDynamicModel config, BakedGeoModel model) {
+    private static void applyPartConfig(ModelPartConfig config, ModelPart part, boolean restore) {
+        part.visible = config.visible;
+        Vector3f pos = new Vector3f(config.x, config.y, config.z);
+        Vector3f rot = new Vector3f(config.xRot, config.yRot, config.zRot);
+        Vector3f scale = new Vector3f(config.xScale - 1, config.yScale - 1, config.zScale - 1);
+        if (restore) {
+            pos.negate();
+            rot.negate();
+            scale.negate();
+        }
+        part.offsetPos(pos);
+        part.offsetRotation(rot);
+        part.offsetScale(scale);
+    }
+
+    public static void updateGeoPart(@Nullable NpcDynamicModel config, BakedGeoModel model, boolean restore) {
+        if (config == null) return;
         for (var geoBone : model.topLevelBones()) {
-            if (tryCopyConfig(config, geoBone)) continue;
+            if (tryCopyConfig(config, geoBone, restore)) continue;
             for (var child : geoBone.getChildBones()) {
-                tryCopyConfig(config, child);
+                tryCopyConfig(config, child, restore);
             }
         }
     }
 
-    private static boolean tryCopyConfig(NpcDynamicModel config, GeoBone geoBone) {
+    private static boolean tryCopyConfig(NpcDynamicModel config, GeoBone geoBone, boolean restore) {
         String name = geoBone.getName().toLowerCase();
-        if (name.contains("head")) return copy(config.getHead(), geoBone);
-        if (name.contains("body")) return copy(config.getBody(), geoBone);
+        if (name.contains("head")) return copy(config.getHead(), geoBone, restore);
+        if (name.contains("body")) return copy(config.getBody(), geoBone, restore);
         if (name.contains("left") && (name.contains("arm") || name.contains("hand"))) {
-            return copy(config.getArmL(), geoBone);
+            return copy(config.getArmL(), geoBone, restore);
         }
         if (name.contains("right") && (name.contains("arm") || name.contains("hand"))) {
-            return copy(config.getArmR(), geoBone);
+            return copy(config.getArmR(), geoBone, restore);
         }
         if (name.contains("left") && (name.contains("leg") || name.contains("foot"))) {
-            return copy(config.getLegL(), geoBone);
+            return copy(config.getLegL(), geoBone, restore);
         }
         if (name.contains("right") && (name.contains("leg") || name.contains("foot"))) {
-            return copy(config.getLegR(), geoBone);
+            return copy(config.getLegR(), geoBone, restore);
         }
         return false;
     }
 
-    private static boolean copy(ModelPartConfig config, GeoBone geoBone) {
-        BeanUtil.copyProperties(config.transform(), geoBone);
+    private static boolean copy(ModelPartConfig config, GeoBone bone, boolean restore) {
+        bone.setHidden(!config.visible);
+        bone.updateScale(config.xScale, config.yScale, config.zScale);
+        if (restore) {
+            bone.updatePosition(bone.getPosX()-config.x, bone.getPosY()-config.y, bone.getPosZ()-config.z);
+            bone.updateRotation(bone.getRotX()-config.xRot, bone.getRotY()-config.yRot, bone.getRotZ()-config.zRot);
+        } else {
+            bone.updatePosition(bone.getPosX()+config.x, bone.getPosY()+config.y, bone.getPosZ()+config.z);
+            bone.updateRotation(bone.getRotX()+config.xRot, bone.getRotY()+config.yRot, bone.getRotZ()+config.zRot);
+        }
         return true;
     }
 }

@@ -61,7 +61,7 @@ public class NpcCommand implements ICommand {
                 stream.filter(Files::isRegularFile).forEach(file -> {
                     String string = file.toString();
                     if (string.endsWith(".npc")) {
-                        npcFiles.add("\"" + string.replace(assets.getPath() + "\\", "").replace("\\", "/").replace(".npc", "") + "\"");
+                        npcFiles.add("\"" + string.replace(assets.getPath(), "").substring(1).replace("\\", "/").replace(".npc", "") + "\"");
                     }
                 });
             } catch (IOException ignored) {

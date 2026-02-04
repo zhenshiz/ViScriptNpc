@@ -81,8 +81,8 @@ public class NpcBasicsSetting implements INpcData {
     @Getter
     @AllArgsConstructor
     public enum SkinType implements StringRepresentable {
-        RESOURCE_PACK("resourcePack"),
-        PLAYER_NAME("playerName");
+        RESOURCE_PACK("npcConfig.npcBasicsSetting.skinType.resourcePack"),
+        PLAYER_NAME("npcConfig.npcBasicsSetting.skinType.playerName");
 
         private final String name;
 

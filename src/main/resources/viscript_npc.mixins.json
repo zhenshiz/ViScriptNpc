@@ -6,11 +6,10 @@
   "refmap": "viscript_npc.refmap.json",
   "mixins": [
     "EntityPredicateMixin",
-    "GeoModelAccessor",
-    "ItemStackAccessorMixin",
-    "LivingEntityMixin"
+    "ItemStackAccessorMixin"
   ],
   "client": [
+    "GeoRendererMixin",
     "LivingEntityRenderMixin"
   ],
   "injectors": {

@@ -17,7 +17,6 @@ import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.gui.edit.npc.NPC;
 import com.viscript.npc.network.c2s.C2SPayload;
 import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
-import com.viscript.npc.util.npc.NpcHelper;
 import lombok.Getter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -96,16 +95,18 @@ public class NPCProject implements IProject {
                                             try {
                                                 var fileData = npc.serializeNBT(Platform.getFrozenRegistry());
                                                 NbtIo.writeCompressed(fileData, file.toPath());
-                                                NpcHelper.clearCache();
                                             } catch (Exception ignored) {
                                             }
                                         }
                                     }).show(editor));
                             m.leaf("editor.project.upload_npc", () -> {
-                                if (getCurrentNpcType().isEmpty()) Dialog.showNotification("上传文件失败", "npc标记（作为文件名）不能为空！", null).show(editor);
-                                else {
+                                String fileName = getCurrentNpcType();
+                                if (fileName.isEmpty()) Dialog.showNotification("editor.project.upload.failed", "editor.project.upload.failed.1", null).show(editor);
+                                else if (hasIllegalChars(fileName)) {
+                                    Dialog.showNotification("editor.project.upload.failed", "editor.project.upload.failed.2", null).show(editor);
+                                } else {
                                     var fileData = npc.serializeNBT(Platform.getFrozenRegistry());
-                                    fileData.putString("fileName", getCurrentNpcType());
+                                    fileData.putString("fileName", fileName);
                                     RPCPacketDistributor.rpcToServer(C2SPayload.UPLOAD_NPC_FILE, fileData);
                                 }
                             });
@@ -120,5 +121,13 @@ public class NPCProject implements IProject {
             exportMenuSubscription.unsubscribe();
             exportMenuSubscription = null;
         }
+    }
+
+    static final String illegalChars = "\\:*?\"<>|";
+    public static boolean hasIllegalChars(String fileName) {
+        for (char c : illegalChars.toCharArray()) {
+            if (fileName.indexOf(c) >= 0) return true;
+        }
+        return false;
     }
 }

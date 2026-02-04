@@ -7,31 +7,33 @@ import lombok.Data;
 
 @Data
 public class ModelPartConfig implements INpcData {
+    @Configurable
+    @ConfigNumber(range = {-1145, 1145})
+    public float x = 0;
+    @Configurable
+    @ConfigNumber(range = {-1145, 1145})
+    public float y = 0;
+    @Configurable
+    @ConfigNumber(range = {-1145, 1145})
+    public float z = 0;
+    @Configurable
+    @ConfigNumber(range = {-314, 314})
+    public float xRot = 0;
+    @Configurable
+    @ConfigNumber(range = {-314, 314})
+    public float yRot = 0;
+    @Configurable
+    @ConfigNumber(range = {-314, 314})
+    public float zRot = 0;
     @Configurable(name = "npcConfig.npcDynamicModel.modelPartConfig.xScale")
     @ConfigNumber(range = {0, Float.MAX_VALUE})
-    private float xScale = 1.0f;
+    public float xScale = 1.0f;
     @Configurable(name = "npcConfig.npcDynamicModel.modelPartConfig.yScale")
     @ConfigNumber(range = {0, Float.MAX_VALUE})
-    private float yScale = 1.0f;
+    public float yScale = 1.0f;
     @Configurable(name = "npcConfig.npcDynamicModel.modelPartConfig.zScale")
     @ConfigNumber(range = {0, Float.MAX_VALUE})
-    private float zScale = 1.0f;
+    public float zScale = 1.0f;
     @Configurable(name = "npcConfig.npcDynamicModel.modelPartConfig.visible")
-    private boolean visible = true;
-
-    public static class GeoBoneConfig {
-        public float scaleX = 1f;
-        public float scaleY = 1f;
-        public float scaleZ = 1f;
-        public boolean hidden = false;
-    }
-
-    public GeoBoneConfig transform() {
-        GeoBoneConfig geoBoneConfig = new GeoBoneConfig();
-        geoBoneConfig.scaleX = this.xScale;
-        geoBoneConfig.scaleY = this.yScale;
-        geoBoneConfig.scaleZ = this.zScale;
-        geoBoneConfig.hidden = !this.visible;
-        return geoBoneConfig;
-    }
+    public boolean visible = true;
 }

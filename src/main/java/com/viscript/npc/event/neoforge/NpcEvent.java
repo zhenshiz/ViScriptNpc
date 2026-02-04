@@ -2,7 +2,6 @@ package com.viscript.npc.event.neoforge;
 
 import com.viscript.npc.npc.CustomNpc;
 import lombok.Getter;
-import lombok.Setter;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;

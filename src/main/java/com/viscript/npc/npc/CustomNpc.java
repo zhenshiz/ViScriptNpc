@@ -2,10 +2,13 @@ package com.viscript.npc.npc;
 
 import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.math.Range;
+import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
+import com.lowdragmc.lowdraglib2.syncdata.annotation.DescSynced;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.event.neoforge.NpcEvent;
 import com.viscript.npc.gui.edit.data.NpcConfig;
+import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
@@ -25,6 +28,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
@@ -58,18 +62,25 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
+import net.neoforged.neoforge.event.OnDatapackSyncEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.*;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     private static final Map<Class<? extends INpcData>, AttachmentType<? extends INpcData>> NPC_DATA_ATTACHMENTS = new HashMap<>();
+    @DescSynced
+    public static Set<String> lootTableKeys = Set.of();
 
     static {
         ViScriptNpc.executePluginMethod(plugin -> plugin.registerNpc(new RegisterNpcEvent()));
@@ -292,9 +303,11 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
         NpcInventory npcInventory = this.getNpcInventory();
         switch (npcInventory.getLootTableType()) {
             case DATAPACK -> {
+                if (!lootTableKeys.contains(npcInventory.getLootTable())) return;
+
                 ResourceLocation lootTableRes = ResourceLocation.parse(npcInventory.getLootTable());
                 ResourceKey<LootTable> resourcekey = ResourceKey.create(Registries.LOOT_TABLE, lootTableRes);
-                LootTable loottable = this.level().getServer().reloadableRegistries().getLootTable(resourcekey);
+                LootTable loottable = Objects.requireNonNull(getServer()).reloadableRegistries().getLootTable(resourcekey);
                 LootParams.Builder lootparams$builder = new LootParams.Builder((ServerLevel) this.level())
                         .withParameter(LootContextParams.THIS_ENTITY, this)
                         .withParameter(LootContextParams.ORIGIN, this.position())
@@ -550,6 +563,29 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
                 int random = Mth.randomBetweenInclusive(RandomSource.create(), levelConfig.getMin().intValue(), levelConfig.getMax().intValue());
                 event.setDroppedExperience(random);
             }
+        }
+
+        @SubscribeEvent
+        public static void setLootTableKeys(OnDatapackSyncEvent event) {
+            if (event.getPlayer() == null) {
+                MinecraftServer server = event.getPlayerList().getServer();
+                setLootTableKeys(server);
+                server.getPlayerList().getPlayers().forEach(EventHandler::sendLootTableKeys);
+            } else sendLootTableKeys(event.getPlayer());
+        }
+
+        @SubscribeEvent
+        public static void setLootTableKeys(ServerStartedEvent event) {
+            setLootTableKeys(event.getServer());
+        }
+
+        private static void setLootTableKeys(MinecraftServer server) {
+            lootTableKeys = server.reloadableRegistries().getKeys(Registries.LOOT_TABLE).stream().map(ResourceLocation::toString).collect(Collectors.toSet());
+        }
+
+        private static void sendLootTableKeys(ServerPlayer player) {
+            if (player.server.getPlayerList().isOp(player.getGameProfile()))
+                RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_LOOT_TABLES, lootTableKeys);
         }
     }
 }

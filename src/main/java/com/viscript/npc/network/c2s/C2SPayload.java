@@ -14,7 +14,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 
 import java.io.File;
-import java.io.IOException;
 
 public class C2SPayload {
     public static final String CREATE_NPC = "createNpc";
@@ -61,20 +60,20 @@ public class C2SPayload {
                 if (file.getParentFile().mkdirs()) {
                     try {
                         if (!file.createNewFile()) {
-                            sendEditorDialog(player, "上传文件失败", "无法创建npc文件！");
+                            sendEditorDialog(player, "editor.project.upload.failed", "editor.project.upload.failed.3");
                             return;
                         }
-                    } catch (IOException e) {
-                        sendEditorDialog(player, "上传文件失败", "无法创建npc文件！" + e.getMessage());
+                    } catch (Exception e) {
+                        sendEditorDialog(player, "editor.project.upload.failed", "editor.project.upload.failed.3");
                         return;
                     }
                 }
             }
             try {
                 NbtIo.writeCompressed(tag, file.toPath());
-                sendEditorDialog(player, "上传文件成功", exists ? "已覆盖同名npc文件！" : "已创建新npc文件并写入！");
-            } catch (IOException e) {
-                sendEditorDialog(player, "上传文件失败", "无法写入npc文件！" + e.getMessage());
+                sendEditorDialog(player, "editor.project.upload.success", exists ? "editor.project.upload.success.1" : "editor.project.upload.success.2");
+            } catch (Exception e) {
+                sendEditorDialog(player, "editor.project.upload.failed", "editor.project.upload.failed.4");
             }
         }
     }
