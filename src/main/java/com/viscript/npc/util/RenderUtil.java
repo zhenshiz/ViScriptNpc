@@ -707,13 +707,13 @@ public class RenderUtil {
             
             float height 高
             """)
-    public static void renderImage(GuiGraphics guiGraphics, ResourceLocation resourceLocation, float x, float y, float z, float uw, float uh, float width, float height) {
+    public static void renderImage(GuiGraphics guiGraphics, ResourceLocation resourceLocation, float x, float y, float uw, float uh, float width, float height) {
         BufferBuilder bufferBuilder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
         Matrix4f matrix4f = guiGraphics.pose().last().pose();
-        bufferBuilder.addVertex(matrix4f, x, y, z).setUv(0, 0);
-        bufferBuilder.addVertex(matrix4f, x, y + height, z).setUv(0, uh);
-        bufferBuilder.addVertex(matrix4f, x + width, y + height, z).setUv(uw, uh);
-        bufferBuilder.addVertex(matrix4f, x + width, y, z).setUv(uw, 0);
+        bufferBuilder.addVertex(matrix4f, x, y, 0).setUv(0, 0);
+        bufferBuilder.addVertex(matrix4f, x, y + height, 0).setUv(0, uh);
+        bufferBuilder.addVertex(matrix4f, x + width, y + height, 0).setUv(uw, uh);
+        bufferBuilder.addVertex(matrix4f, x + width, y, 0).setUv(uw, 0);
 
         RenderSystem.setShader(GameRenderer::getPositionTexShader);
         RenderSystem.setShaderTexture(0, resourceLocation);
@@ -740,12 +740,12 @@ public class RenderUtil {
             
             float scale 缩放比例
             """)
-    public static void renderImage(GuiGraphics guiGraphics, ResourceLocation resourceLocation, float x, float y, float z, float width, float height, float scale) {
+    public static void renderImage(GuiGraphics guiGraphics, ResourceLocation resourceLocation, float x, float y, float width, float height, float scale) {
         x = x / scale;
         y = y / scale;
         guiGraphics.pose().pushPose();
         guiGraphics.pose().scale(scale, scale, scale);
-        renderImage(guiGraphics, resourceLocation, x, y, z, 1, 1, width, height);
+        renderImage(guiGraphics, resourceLocation, x, y, 1, 1, width, height);
         guiGraphics.pose().popPose();
     }
 

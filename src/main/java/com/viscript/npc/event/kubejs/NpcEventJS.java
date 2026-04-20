@@ -4,24 +4,18 @@ import com.viscript.npc.event.neoforge.NpcEvent;
 import com.viscript.npc.npc.CustomNpc;
 import dev.latvian.mods.kubejs.event.KubeEvent;
 import lombok.Getter;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 
 @Getter
 public class NpcEventJS implements KubeEvent {
     private final CustomNpc npc;
-    private final ServerLevel level;
-    private final MinecraftServer server;
 
     public NpcEventJS(NpcEvent event) {
         this.npc = event.getNpc();
-        this.level = event.getLevel();
-        this.server = event.getServer();
     }
 
     public static class Spawn extends NpcEventJS {
@@ -42,7 +36,7 @@ public class NpcEventJS implements KubeEvent {
 
     @Getter
     public static class Interact extends NpcEventJS {
-        private final ServerPlayer player;
+        private final Player player;
 
         public Interact(NpcEvent.Interact event) {
             super(event);

@@ -28,7 +28,6 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 
 @Data
@@ -68,7 +67,7 @@ public class NpcInventory implements INpcData {
 
     private void LootTableTypeSubConfiguratorBuilder(LootTableType value, ConfiguratorGroup group) {
         switch (value) {
-            case DATAPACK -> group.addConfigurator(ConfiguratorUtil.createStrArrSearchComponentConfigurator("npcConfig.npcInventory.lootTable", new HashSet<>(CustomNpc.lootTableKeys),
+            case DATAPACK -> group.addConfigurator(ConfiguratorUtil.createStrArrSearchComponentConfigurator("npcConfig.npcInventory.lootTable", CustomNpc.lootTableKeys,
                     this::getLootTable, this::setLootTable)
             );
             case CUSTOM -> {

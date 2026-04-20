@@ -30,8 +30,8 @@ public class NpcListView extends View {
         super(String.format("%s.editor.view.npcList", ViScriptNpc.MOD_ID));
         this.editor = editor;
         this.scrollerView.layout((layout) -> {
-            layout.setWidthPercent(100.0F);
-            layout.setFlex(1.0F);
+            layout.widthPercent(100.0F);
+            layout.flex(1.0F);
         });
         this.addChild(new Button().setOnClick(event -> {
             if (editor.getCurrentProject() instanceof NPCProject npcProject) {
@@ -40,8 +40,8 @@ public class NpcListView extends View {
                 RPCPacketDistributor.rpcToServer(C2SPayload.CREATE_NPC, tag);
             }
         }).setText("生成NPC").layout(layout -> {
-            layout.setWidthPercent(50.0F);
-            layout.setHeight(12);
+            layout.widthPercent(50.0F);
+            layout.height(12);
         }));
         if (player != null) {
             Map<String, CustomNpc> npcMap = new HashMap<>();
@@ -52,8 +52,8 @@ public class NpcListView extends View {
                 UIElement npcElement = new TextElement()
                         .setText(Component.nullToEmpty(type))
                         .layout((layout) -> {
-                            layout.setWidthPercent(100.0F);
-                            layout.setHeight(10);
+                            layout.widthPercent(100.0F);
+                            layout.height(10);
                         })
                         .addEventListener(UIEvents.DOUBLE_CLICK, (event) -> {
                             NPCProject project = (NPCProject) NPCProject.PROVIDER.projectCreator.get();

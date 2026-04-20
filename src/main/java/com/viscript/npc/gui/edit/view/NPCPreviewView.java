@@ -23,6 +23,7 @@ import com.viscript.npc.gui.edit.data.NpcConfig;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.NpcRegister;
 import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
+import dev.vfyjxf.taffy.style.FlexDirection;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.renderer.GameRenderer;
@@ -33,9 +34,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
-import org.appliedenergistics.yoga.YogaEdge;
-import org.appliedenergistics.yoga.YogaFlexDirection;
-import org.appliedenergistics.yoga.YogaGutter;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
@@ -58,12 +56,12 @@ public class NPCPreviewView extends View {
         this.editor = editor;
         customNpc = NpcRegister.CUSTOM_NPC.get().create(level);
 
-        this.getLayout().setWidthPercent(100);
-        this.getLayout().setHeightPercent(100);
+        this.getLayout().widthPercent(100);
+        this.getLayout().heightPercent(100);
         sceneEditor = new NpcSceneEditor();
         sceneEditor.layout(layout -> {
-            layout.setWidthPercent(100);
-            layout.setFlex(1);
+            layout.widthPercent(100);
+            layout.flex(1);
         });
         sceneEditor.scene
                 .createScene(level)
@@ -168,9 +166,9 @@ public class NPCPreviewView extends View {
         public void initTopBar() {
             super.initTopBar();
             UIElement toggleButton = new UIElement().layout(layout -> {
-                layout.setHeightPercent(100);
-                layout.setFlexDirection(YogaFlexDirection.ROW_REVERSE);
-                layout.setGap(YogaGutter.ALL, 1);
+                layout.heightPercent(100);
+                layout.flexDirection(FlexDirection.ROW_REVERSE);
+                layout.gapAll(1);
             });
             toggleButton.addChild(
                     new SceneToggleBuilder(sceneView()::isCullBoxVisible,
@@ -197,8 +195,8 @@ public class NPCPreviewView extends View {
                     .setText("")
                     .setOn(transformGizmoMode == mode, false)
                     .toggleButton(button -> button.layout(layout -> {
-                        layout.setWidthPercent(100);
-                        layout.setHeightPercent(100);
+                        layout.widthPercent(100);
+                        layout.heightPercent(100);
                     }))
                     .setOnToggleChanged(isOn -> {
                         setTransformGizmoMode(isOn ? mode : TransformGizmoMode.NONE);
@@ -210,8 +208,8 @@ public class NPCPreviewView extends View {
                         style.markTexture(new GuiTextureGroup(ColorPattern.T_BLUE.rectTexture(), icon));
                     })
                     .layout(layout -> {
-                        layout.setPadding(YogaEdge.ALL, 0);
-                        layout.setWidthPercent(100);
+                        layout.paddingAll(0);
+                        layout.widthPercent(100);
                         layout.setAspectRatio(1f);
                     }).addEventListener(UIEvents.TICK, event -> {
                         if (event.currentElement instanceof Toggle toggle) {

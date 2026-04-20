@@ -4,13 +4,15 @@ import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Dialog;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.ItemSlot;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
+import dev.vfyjxf.taffy.style.FlexDirection;
+import dev.vfyjxf.taffy.style.FlexWrap;
+import dev.vfyjxf.taffy.style.TaffyDimension;
+import dev.vfyjxf.taffy.style.TaffyDisplay;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import org.appliedenergistics.yoga.*;
-import org.appliedenergistics.yoga.style.StyleSizeLength;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -26,17 +28,17 @@ public class SelectItemDialog extends Dialog {
         super();
         this.onItemSelected = onItemSelected;
         this.setTitle("viscript_npc.selectItemDialog.title");
-        this.buttonContainer.setDisplay(YogaDisplay.NONE);
-        this.width(StyleSizeLength.points(200));
+        this.buttonContainer.setDisplay(TaffyDisplay.NONE);
+        this.width(TaffyDimension.length(200));
         this.getStyle().zIndex(100);
 
         // 主容器：垂直布局
         this.mainContainer = new UIElement();
         mainContainer.layout(layout -> {
-            layout.setWidthPercent(100);
-            layout.setFlexDirection(YogaFlexDirection.COLUMN);
-            layout.setGap(YogaGutter.ALL, 5);  // 背包和快捷栏之间的间距
-            layout.setPadding(YogaEdge.ALL, 5);
+            layout.widthPercent(100);
+            layout.flexDirection(FlexDirection.COLUMN);
+            layout.gapAll(5);  // 背包和快捷栏之间的间距
+            layout.paddingAll(5);
         });
 
         Minecraft minecraft = Minecraft.getInstance();
@@ -55,10 +57,10 @@ public class SelectItemDialog extends Dialog {
         // 1. 主背包（3行9列，索引 9-35）
         UIElement backpackContainer = new UIElement();
         backpackContainer.layout(layout -> {
-            layout.setFlexDirection(YogaFlexDirection.ROW);
-            layout.setWrap(YogaWrap.WRAP);
-            layout.setGap(YogaGutter.ALL, 2);
-            layout.setWidth(9 * 18 + 8 * 2);
+            layout.flexDirection(FlexDirection.ROW);
+            layout.wrap(FlexWrap.WRAP);
+            layout.gapAll(2);
+            layout.width(9 * 18 + 8 * 2);
         });
 
         for (int i = 9; i < 36; i++) {
@@ -69,9 +71,9 @@ public class SelectItemDialog extends Dialog {
         // 2. 快捷栏（1行9列，索引 0-8）
         UIElement hotbarContainer = new UIElement();
         hotbarContainer.layout(layout -> {
-            layout.setFlexDirection(YogaFlexDirection.ROW);
-            layout.setGap(YogaGutter.ALL, 2);
-            layout.setWidth(9 * 18 + 8 * 2);
+            layout.flexDirection(FlexDirection.ROW);
+            layout.gapAll(2);
+            layout.width(9 * 18 + 8 * 2);
         });
 
         for (int i = 0; i < 9; i++) {
@@ -96,8 +98,8 @@ public class SelectItemDialog extends Dialog {
         slot.setItem(itemStack);
 
         slot.layout(layout -> {
-            layout.setWidth(18);
-            layout.setHeight(18);
+            layout.width(18);
+            layout.height(18);
         });
 
         final ItemStack finalStack = itemStack.copy();

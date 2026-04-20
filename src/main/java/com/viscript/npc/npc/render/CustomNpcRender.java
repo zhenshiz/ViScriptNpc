@@ -10,7 +10,6 @@ import com.viscript.npc.npc.data.dynamic.model.ModelPartConfig;
 import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
 import com.viscript.npc.npc.layer.CapeLayer;
 import com.viscript.npc.npc.layer.INpcAppearancePart;
-import com.viscript.npc.util.common.BeanUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.model.HumanoidModel;
@@ -26,10 +25,7 @@ import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
 import net.minecraft.client.renderer.entity.layers.ItemInHandLayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityAttachment;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.ClientHooks;
@@ -114,20 +110,57 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
         }
     }
 
+    // 用于实体模型、动画的渲染。你问我到底哪些参数有用？我也不知道
+    private static void copyNpcProperties(CustomNpc npc, Entity entity) {
+        entity.setXRot(npc.getXRot()); entity.xRotO = npc.xRotO;
+        entity.setYRot(npc.getYRot()); entity.yRotO = npc.yRotO;
+        entity.setYHeadRot(npc.yHeadRot);
+        entity.setYBodyRot(npc.yBodyRot);
+        entity.setOnGround(npc.onGround());
+        entity.setDeltaMovement(npc.getDeltaMovement());
+        entity.setTicksFrozen(npc.getTicksFrozen());
+        entity.setRemainingFireTicks(npc.getRemainingFireTicks());
+        entity.setShiftKeyDown(npc.isShiftKeyDown());
+        entity.setSprinting(npc.isSprinting());
+        entity.setSwimming(npc.isSwimming());
+        entity.setPose(npc.getPose());
+        entity.walkDist = npc.walkDist;
+        entity.walkDistO = npc.walkDistO;
+        if (entity instanceof LivingEntity living) {
+            living.yHeadRotO = npc.yHeadRotO; living.yBodyRotO = npc.yBodyRotO;
+            living.useItem = npc.useItem;
+            living.useItemRemaining = npc.useItemRemaining;
+            living.setLivingEntityFlag(1, npc.isUsingItem());
+            living.swingingArm = npc.swingingArm;
+            living.swinging = npc.swinging;
+            living.swingTime = npc.swingTime;
+            living.attackAnim = npc.attackAnim;
+            living.oAttackAnim = npc.oAttackAnim;
+            living.walkAnimation.setSpeed(npc.walkAnimation.speed());
+            living.hurtTime = npc.hurtTime;
+            living.deathTime = npc.deathTime;
+            living.tickCount = npc.tickCount;
+            living.xxa = npc.xxa;
+            living.yya = npc.yya;
+            living.zza = npc.zza;
+            living.setSpeed(npc.getSpeed());
+            living.setNoActionTime(npc.getNoActionTime());
+            for (var value : EquipmentSlot.values()) living.setItemSlot(value, npc.getItemBySlot(value));
+            var attribute = living.getAttribute(Attributes.SCALE);
+            if (attribute != null) attribute.setBaseValue(npc.getNpcBasicsSetting().getModeSize());
+            if (living instanceof Mob mob) {
+                mob.setAggressive(npc.isAggressive());
+            }
+        }
+    }
+
     @Override
     public void render(T npc, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         Entity entity = npc.getNpcDynamicModel().getEntity(npc);
         int color = npc.getNpcBasicsSetting().getSkinColor();
         if (entity != null) {
             // 复制所有需要的npc属性给用于渲染的实体
-            BeanUtil.copyProperties(npc, entity);
-            if (entity instanceof LivingEntity livingEntity) {
-                for (EquipmentSlot value : EquipmentSlot.values()) {
-                    livingEntity.setItemSlot(value, npc.getItemBySlot(value));
-                }
-                var attribute = livingEntity.getAttribute(Attributes.SCALE);
-                if (attribute != null) attribute.setBaseValue(npc.getNpcBasicsSetting().getModeSize());
-            }
+            copyNpcProperties(npc, entity);
 
             EntityRenderer<? super Entity> render = this.entityRenderDispatcher.getRenderer(entity);
 

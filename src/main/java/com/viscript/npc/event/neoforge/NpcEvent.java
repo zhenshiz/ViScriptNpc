@@ -2,12 +2,10 @@ package com.viscript.npc.event.neoforge;
 
 import com.viscript.npc.npc.CustomNpc;
 import lombok.Getter;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.Event;
 import net.neoforged.bus.api.ICancellableEvent;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
@@ -21,13 +19,9 @@ import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 @Getter
 public abstract class NpcEvent extends Event {
     private final CustomNpc npc;
-    private final ServerLevel level;
-    private final MinecraftServer server;
 
     public NpcEvent(CustomNpc npc) {
         this.npc = npc;
-        this.level = (ServerLevel) npc.level();
-        this.server = npc.getServer();
     }
 
     public static class Spawn extends NpcEvent implements ICancellableEvent {
@@ -48,9 +42,9 @@ public abstract class NpcEvent extends Event {
 
     @Getter
     public static class Interact extends NpcEvent implements ICancellableEvent {
-        private final ServerPlayer player;
+        private final Player player;
 
-        public Interact(CustomNpc npc, ServerPlayer player) {
+        public Interact(CustomNpc npc, Player player) {
             super(npc);
             this.player = player;
         }

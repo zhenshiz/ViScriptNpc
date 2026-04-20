@@ -113,7 +113,7 @@ public class MeleeConfig implements INpcData {
     public static void executeAdditionalEffects(CustomNpc npc, LivingEntity hurtEntity) {
         MeleeConfig meleeConfig = npc.getNpcAttributes().getMeleeConfig();
         switch (meleeConfig.getAdditionalEffects()) {
-            case FIRE -> hurtEntity.igniteForSeconds((Float) meleeConfig.getSeconds());
+            case FIRE -> hurtEntity.igniteForSeconds((float) (int) meleeConfig.getSeconds());
             case POTION -> {
                 BuiltInRegistries.MOB_EFFECT.getHolder(ResourceLocation.parse(meleeConfig.getDebuffEffect())).ifPresent(mobEffect ->
                         hurtEntity.addEffect(new MobEffectInstance(mobEffect, (Integer) meleeConfig.getSeconds() * 20, (Integer) meleeConfig.getAmplifier(), false, false)));
@@ -124,9 +124,9 @@ public class MeleeConfig implements INpcData {
     @Getter
     @AllArgsConstructor
     public enum AdditionalEffects implements StringRepresentable {
-        NONE(Component.translatable("npcConfig.npcAttributes.meleeConfig.additionalEffects.none").getString()),
-        POTION(Component.translatable("npcConfig.npcAttributes.meleeConfig.additionalEffects.potion").getString()),
-        FIRE(Component.translatable("npcConfig.npcAttributes.meleeConfig.additionalEffects.fire").getString());
+        NONE("npcConfig.npcAttributes.meleeConfig.additionalEffects.none"),
+        POTION("npcConfig.npcAttributes.meleeConfig.additionalEffects.potion"),
+        FIRE("npcConfig.npcAttributes.meleeConfig.additionalEffects.fire");
 
         private final String name;
 
