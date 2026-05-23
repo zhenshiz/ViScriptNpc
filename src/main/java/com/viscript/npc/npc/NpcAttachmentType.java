@@ -1,68 +1,66 @@
 package com.viscript.npc.npc;
 
+import com.lowdragmc.lowdraglib2.registry.AutoRegistry;
+import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.mojang.serialization.Codec;
 import com.viscript.npc.ViScriptNpc;
-import com.viscript.npc.npc.data.attributes.NpcAttributes;
-import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
-import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
-import com.viscript.npc.npc.data.inventory.NpcInventory;
-import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
-import com.viscript.npc.util.common.StrUtil;
+import com.viscript.npc.ViScriptNpcRegistries;
+import com.viscript.npc.npc.data.INpcData;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.neoforged.neoforge.attachment.AttachmentType;
+import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 public class NpcAttachmentType {
     public static final DeferredRegister<AttachmentType<?>> ATTACHMENT_TYPES = DeferredRegister.create(NeoForgeRegistries.ATTACHMENT_TYPES, ViScriptNpc.MOD_ID);
 
-    public static final Supplier<AttachmentType<NpcBasicsSetting>> NPC_BASICS_SETTING = register(
-            NpcBasicsSetting.class,
-            NpcBasicsSetting::new,
-            NpcBasicsSetting.CODEC,
-            NpcBasicsSetting.STREAM_CODEC
-    );
+    private static final Map<Class<? extends INpcData>, Supplier<AttachmentType<INpcData>>> NPC_DATA_ATTACHMENTS = new LinkedHashMap<>();
+    private static final Map<Class<? extends INpcData>, String> NPC_DATA_ATTACHMENT_NAMES = new LinkedHashMap<>();
 
-    public static final Supplier<AttachmentType<NpcDynamicModel>> NPC_DYNAMIC_MODEL = register(
-            NpcDynamicModel.class,
-            NpcDynamicModel::new,
-            NpcDynamicModel.CODEC,
-            NpcDynamicModel.STREAM_CODEC
-    );
+    static {
+        for (AutoRegistry.Holder<LDLRegister, INpcData, Supplier<INpcData>> npcData : ViScriptNpcRegistries.NPC_DATA) {
+            register(npcData.annotation().name(), npcData.clazz(), npcData.value(), INpcData.CODEC, INpcData.STREAM_CODEC);
+        }
+    }
 
-    public static final Supplier<AttachmentType<NpcAttributes>> NPC_ATTRIBUTES = register(
-            NpcAttributes.class,
-            NpcAttributes::new,
-            NpcAttributes.CODEC,
-            NpcAttributes.STREAM_CODEC
-    );
+    public static AttachmentType<INpcData> getAttachment(Class<? extends INpcData> clazz) {
+        Supplier<AttachmentType<INpcData>> attachmentType = NPC_DATA_ATTACHMENTS.get(clazz);
+        if (attachmentType == null) {
+            throw new IllegalArgumentException("Unknown npc data type: " + clazz.getName());
+        }
+        return attachmentType.get();
+    }
 
-    public static final Supplier<AttachmentType<NpcInventory>> NPC_INVENTORY = register(
-            NpcInventory.class,
-            NpcInventory::new,
-            NpcInventory.CODEC,
-            NpcInventory.STREAM_CODEC
-    );
+    public static Set<Class<? extends INpcData>> getAttachmentClasses() {
+        return Collections.unmodifiableSet(NPC_DATA_ATTACHMENTS.keySet());
+    }
 
-    public static final Supplier<AttachmentType<NpcModIntegrations>> NPC_MOD_INTEGRATIONS = register(
-            NpcModIntegrations.class,
-            NpcModIntegrations::new,
-            NpcModIntegrations.CODEC,
-            NpcModIntegrations.STREAM_CODEC
-    );
+    public static String getAttachmentName(Class<? extends INpcData> clazz) {
+        String name = NPC_DATA_ATTACHMENT_NAMES.get(clazz);
+        if (name == null) {
+            throw new IllegalArgumentException("Unknown npc data type: " + clazz.getName());
+        }
+        return name;
+    }
 
-
-    public static <T> Supplier<AttachmentType<T>> register(Class<T> clazz, Supplier<T> supplier, Codec<T> codec, StreamCodec<ByteBuf, T> streamCodec) {
-        return ATTACHMENT_TYPES.register(
-                StrUtil.toSnakeCase(clazz.getSimpleName()),
+    private static void register(String name, Class<? extends INpcData> clazz, Supplier<INpcData> supplier, Codec<INpcData> codec, StreamCodec<ByteBuf, INpcData> streamCodec) {
+        DeferredHolder<AttachmentType<?>, AttachmentType<INpcData>> attachmentTypeDeferredHolder = ATTACHMENT_TYPES.register(
+                name,
                 () -> AttachmentType.builder(supplier)
                         .serialize(codec)
                         .sync(streamCodec)
                         .copyOnDeath()
                         .build()
         );
+        NPC_DATA_ATTACHMENTS.put(clazz, attachmentTypeDeferredHolder);
+        NPC_DATA_ATTACHMENT_NAMES.put(clazz, name);
     }
 }

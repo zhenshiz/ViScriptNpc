@@ -2,19 +2,13 @@ package com.viscript.npc.npc.data.attributes;
 
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
-import com.lowdragmc.lowdraglib2.utils.PersistedParser;
-import com.mojang.serialization.Codec;
+import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.viscript.npc.npc.data.INpcData;
-import io.netty.buffer.ByteBuf;
 import lombok.Data;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 @Data
+@LDLRegister(name = "npc_attributes", registry = INpcData.ID)
 public class NpcAttributes implements INpcData {
-    public static final StreamCodec<ByteBuf, NpcAttributes> STREAM_CODEC;
-    public static final Codec<NpcAttributes> CODEC;
-
     @Configurable(name = "npcConfig.npcAttributes.maxHealth")
     @ConfigNumber(range = {1, 1024}, wheel = 0.1)
     private double maxHealth = 20;
@@ -66,8 +60,4 @@ public class NpcAttributes implements INpcData {
     @ConfigNumber(range = {0, Integer.MAX_VALUE}, wheel = 0.1)
     private float outOfCombatRegenRate = 0;
 
-    static {
-        CODEC = PersistedParser.createCodec(NpcAttributes::new);
-        STREAM_CODEC = ByteBufCodecs.fromCodec(CODEC);
-    }
 }

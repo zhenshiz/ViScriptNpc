@@ -6,11 +6,4 @@ public interface IViScriptNpcPlugin {
      */
     default void init() {
     }
-
-    /**
-     * 注册npc相关内容
-     * @param event npc注册事件
-     */
-    default void registerNpc(RegisterNpcEvent event) {
-    }
 }

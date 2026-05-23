@@ -3,6 +3,7 @@ package com.viscript.npc.command;
 import com.lowdragmc.lowdraglib2.registry.ILDLRegister;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.viscript.npc.ViScriptNpc;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -11,6 +12,7 @@ import net.minecraft.network.chat.Component;
 import java.util.function.Supplier;
 
 public interface ICommand extends ILDLRegister<ICommand, Supplier<ICommand>> {
+    String ID = ViScriptNpc.MOD_ID + ":command";
 
     void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext buildContext, Commands.CommandSelection commandSelection);
 

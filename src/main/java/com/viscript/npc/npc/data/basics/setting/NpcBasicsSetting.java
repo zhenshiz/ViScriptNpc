@@ -6,20 +6,16 @@ import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigSelector;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.configurator.ui.StringConfigurator;
+import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
-import com.lowdragmc.lowdraglib2.utils.PersistedParser;
-import com.mojang.serialization.Codec;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.RenderUtil;
 import com.viscript.npc.util.common.StrUtil;
-import io.netty.buffer.ByteBuf;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.StringRepresentable;
 import org.jetbrains.annotations.NotNull;
@@ -30,9 +26,8 @@ import org.jetbrains.annotations.NotNull;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@LDLRegister(name = "npc_basics_setting", registry = INpcData.ID)
 public class NpcBasicsSetting implements INpcData {
-    public static final StreamCodec<ByteBuf, NpcBasicsSetting> STREAM_CODEC;
-    public static final Codec<NpcBasicsSetting> CODEC;
     @Configurable(name = "npcConfig.npcBasicsSetting.type",tips = "npcConfig.npcBasicsSetting.type.tips")
     private String type = "";
     @Configurable(name = "npcConfig.npcBasicsSetting.customName")
@@ -71,11 +66,6 @@ public class NpcBasicsSetting implements INpcData {
             case PLAYER_NAME ->
                     group.addConfigurator(new StringConfigurator("npcConfig.npcBasicsSetting.texturePlayerName", this::getTexturePlayerName, this::setTexturePlayerName, texturePlayerName, true));
         }
-    }
-
-    static {
-        CODEC = PersistedParser.createCodec(NpcBasicsSetting::new);
-        STREAM_CODEC = ByteBufCodecs.fromCodec(CODEC);
     }
 
     @Getter

@@ -2,6 +2,8 @@ package com.viscript.npc.gui.edit.data;
 
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.viscript.npc.ViScriptNpc;
+import com.viscript.npc.ViScriptNpcRegistries;
+import com.viscript.npc.npc.NpcAttachmentType;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.common.StrUtil;
 import net.minecraft.core.HolderLookup;
@@ -12,16 +14,11 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class NpcConfig implements INpcData {
-    public static final Set<Class<? extends INpcData>> NPC_DATA_CLASSES = new LinkedHashSet<>();
-
     final Set<INpcData> npcData = new LinkedHashSet<>();
 
     {
-        for (Class<? extends INpcData> npcDataClass : NPC_DATA_CLASSES) {
-            try {
-                npcData.add(npcDataClass.getDeclaredConstructor().newInstance());
-            } catch (Exception ignored) {
-            }
+        for (var holder : ViScriptNpcRegistries.NPC_DATA) {
+            npcData.add(holder.value().get());
         }
     }
 
@@ -66,7 +63,7 @@ public class NpcConfig implements INpcData {
             if (tag.contains(name)) npcData.deserializeNBT(provider, tag.getCompound(name));
                 // 适用于从生物身上读数据
             else if (tag.contains("neoforge:attachments")) {
-                npcData.deserializeNBT(provider, tag.getCompound("neoforge:attachments").getCompound(ViScriptNpc.id(StrUtil.toSnakeCase(npcData.getConfigurableName())).toString()));
+                npcData.deserializeNBT(provider, tag.getCompound("neoforge:attachments").getCompound(ViScriptNpc.id(NpcAttachmentType.getAttachmentName(npcData.getClass())).toString()));
             }
         }
     }

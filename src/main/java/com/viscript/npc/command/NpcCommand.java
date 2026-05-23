@@ -26,7 +26,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
-@LDLRegister(name = "npc", registry = "viscript_npc:command")
+@LDLRegister(name = "npc", registry = ICommand.ID)
 public class NpcCommand implements ICommand {
     @Override
     public void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext buildContext, Commands.CommandSelection commandSelection) {
@@ -72,7 +72,7 @@ public class NpcCommand implements ICommand {
 
     static File getNpcFile(String fileName) {
         if (fileName.startsWith("\"")) fileName = fileName.substring(1);
-        if (fileName.endsWith("\""))   fileName = fileName.substring(0, fileName.length() - 1);
+        if (fileName.endsWith("\"")) fileName = fileName.substring(0, fileName.length() - 1);
         return new File(LDLib2.getAssetsDir(), "viscript_npc/npc/" + fileName + ".npc");
     }
 

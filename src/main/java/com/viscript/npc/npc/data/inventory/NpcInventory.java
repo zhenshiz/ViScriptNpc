@@ -8,21 +8,17 @@ import com.lowdragmc.lowdraglib2.configurator.ui.ArrayConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.configurator.ui.Configurator;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.math.Range;
+import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.ReadOnlyManaged;
-import com.lowdragmc.lowdraglib2.utils.PersistedParser;
-import com.mojang.serialization.Codec;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.ConfiguratorUtil;
-import io.netty.buffer.ByteBuf;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.minecraft.nbt.IntTag;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
@@ -33,9 +29,8 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@LDLRegister(name = "npc_inventory", registry = INpcData.ID)
 public class NpcInventory implements INpcData {
-    public static final StreamCodec<ByteBuf, NpcInventory> STREAM_CODEC;
-    public static final Codec<NpcInventory> CODEC;
     @Configurable(name = "npcConfig.npcInventory.helmet")
     private ItemStack helmet = ItemStack.EMPTY;
     @Configurable(name = "npcConfig.npcInventory.chestplate")
@@ -59,11 +54,6 @@ public class NpcInventory implements INpcData {
     @Persisted
     @ReadOnlyManaged(serializeMethod = "writeLootTables", deserializeMethod = "readLootTables")
     private List<LootTableConfig> lootTables = new ArrayList<>();
-
-    static {
-        CODEC = PersistedParser.createCodec(NpcInventory::new);
-        STREAM_CODEC = ByteBufCodecs.fromCodec(CODEC);
-    }
 
     private void LootTableTypeSubConfiguratorBuilder(LootTableType value, ConfiguratorGroup group) {
         switch (value) {

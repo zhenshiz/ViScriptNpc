@@ -6,7 +6,6 @@ import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.event.neoforge.NpcEvent;
-import com.viscript.npc.gui.edit.data.NpcConfig;
 import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
@@ -17,7 +16,6 @@ import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
 import com.viscript.npc.npc.data.inventory.LootTableConfig;
 import com.viscript.npc.npc.data.inventory.NpcInventory;
 import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
-import com.viscript.npc.plugin.RegisterNpcEvent;
 import com.viscript.npc.util.common.StrUtil;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -52,7 +50,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import net.neoforged.neoforge.event.OnDatapackSyncEvent;
@@ -62,20 +59,13 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CustomNpc extends PathfinderMob implements RangedAttackMob {
-    private static final Map<Class<? extends INpcData>, AttachmentType<? extends INpcData>> NPC_DATA_ATTACHMENTS = new HashMap<>();
     public static Set<String> lootTableKeys = Set.of();
-
-    static {
-        ViScriptNpc.executePluginMethod(plugin -> plugin.registerNpc(new RegisterNpcEvent()));
-    }
 
     //披风用参数
     public double xCloakO;
@@ -96,14 +86,8 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
 //        mind = new MindMachine(this);
     }
 
-    public static <T extends INpcData> void putNpcAttachment(Class<T> clazz, AttachmentType<T> attachmentType) {
-        NPC_DATA_ATTACHMENTS.put(clazz, attachmentType);
-        NpcConfig.NPC_DATA_CLASSES.add(clazz);
-    }
-
-    public static <T extends INpcData> AttachmentType<T> getNpcAttachment(Class<T> clazz) {
-        // noinspection unchecked
-        return (AttachmentType<T>) NPC_DATA_ATTACHMENTS.get(clazz);
+    public <T extends INpcData> T getNpcAttachment(Class<T> clazz) {
+        return clazz.cast(this.getData(NpcAttachmentType.getAttachment(clazz)));
     }
 
     @Override
@@ -250,21 +234,19 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
         return super.getItemBySlot(slot);
     }
 
-    public static void readNpcAttachments(CompoundTag tag, CustomNpc npc) {
-        NPC_DATA_ATTACHMENTS.forEach((clazz, attachmentType) ->
-                npc.getData(getNpcAttachment(clazz)).deserializeNBT(Platform.getFrozenRegistry(),
-                        tag.getCompound(StrUtil.toCamelCase(clazz.getSimpleName()))));
-    }
-
     @Override
     public void readAdditionalSaveData(CompoundTag compoundTag) {
         super.readAdditionalSaveData(compoundTag);
-        readNpcAttachments(compoundTag, this);
+        NpcAttachmentType.getAttachmentClasses().forEach(clazz -> {
+            INpcData npcAttachment = this.getNpcAttachment(clazz);
+            npcAttachment.deserializeNBT(Platform.getFrozenRegistry(),
+                    compoundTag.getCompound(StrUtil.toCamelCase(NpcAttachmentType.getAttachmentName(clazz))));
+        });
         updateNpcState();
     }
 
     public void updateNpcState() {
-        NPC_DATA_ATTACHMENTS.forEach((clazz, a) -> syncData(getNpcAttachment(clazz)));
+        NpcAttachmentType.getAttachmentClasses().forEach(clazz -> syncData(NpcAttachmentType.getAttachment(clazz)));
         //基础信息
         NpcBasicsSetting npcBasicsSetting = getNpcBasicsSetting();
         this.setAttributeBaseValue(Attributes.SCALE, npcBasicsSetting.getModeSize());
@@ -349,23 +331,23 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     }
 
     public NpcBasicsSetting getNpcBasicsSetting() {
-        return this.getData(getNpcAttachment(NpcBasicsSetting.class));
+        return getNpcAttachment(NpcBasicsSetting.class);
     }
 
     public NpcDynamicModel getNpcDynamicModel() {
-        return this.getData(getNpcAttachment(NpcDynamicModel.class));
+        return getNpcAttachment(NpcDynamicModel.class);
     }
 
     public NpcAttributes getNpcAttributes() {
-        return this.getData(getNpcAttachment(NpcAttributes.class));
+        return getNpcAttachment(NpcAttributes.class);
     }
 
     public NpcModIntegrations getNpcModIntegrations() {
-        return this.getData(getNpcAttachment(NpcModIntegrations.class));
+        return getNpcAttachment(NpcModIntegrations.class);
     }
 
     public NpcInventory getNpcInventory() {
-        return this.getData(getNpcAttachment(NpcInventory.class));
+        return getNpcAttachment(NpcInventory.class);
     }
 
     public String getNpcType() {
@@ -438,7 +420,8 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     }
 
     @Override
-    public void checkDespawn() {}
+    public void checkDespawn() {
+    }
 
     @EventBusSubscriber(modid = ViScriptNpc.MOD_ID)
     public static class EventHandler {

@@ -3,17 +3,15 @@ package com.viscript.npc.npc.data.dynamic.model;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
+import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
-import com.lowdragmc.lowdraglib2.utils.PersistedParser;
 import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import com.mojang.serialization.Codec;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.ConfiguratorUtil;
 import com.viscript.npc.util.common.BeanUtil;
-import io.netty.buffer.ByteBuf;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -21,8 +19,6 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.TagParser;
 import net.minecraft.network.chat.contents.TranslatableContents;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -33,10 +29,8 @@ import java.util.stream.Collectors;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@LDLRegister(name = "npc_dynamic_model", registry = INpcData.ID)
 public class NpcDynamicModel implements INpcData {
-    public static final StreamCodec<ByteBuf, NpcDynamicModel> STREAM_CODEC;
-    public static final Codec<NpcDynamicModel> CODEC;
-
     //NPC代理的的生物类型，可以使用这个生物的模型和材质
     @Persisted
     private ResourceLocation entityType = ResourceLocation.withDefaultNamespace("player");
@@ -65,11 +59,6 @@ public class NpcDynamicModel implements INpcData {
     //缓存的生物，用于让npc展示其模型和材质
     private Entity entity;
     private ResourceLocation tempEntityType;
-
-    static {
-        CODEC = PersistedParser.createCodec(NpcDynamicModel::new);
-        STREAM_CODEC = ByteBufCodecs.fromCodec(CODEC);
-    }
 
     public static CompoundTag tagFromString(String nbt) {
         StringReader reader = new StringReader(nbt);
