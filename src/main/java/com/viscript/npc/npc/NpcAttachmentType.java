@@ -2,12 +2,9 @@ package com.viscript.npc.npc;
 
 import com.lowdragmc.lowdraglib2.registry.AutoRegistry;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
-import com.mojang.serialization.Codec;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.ViScriptNpcRegistries;
 import com.viscript.npc.npc.data.INpcData;
-import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.StreamCodec;
 import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -27,7 +24,7 @@ public class NpcAttachmentType {
 
     static {
         for (AutoRegistry.Holder<LDLRegister, INpcData, Supplier<INpcData>> npcData : ViScriptNpcRegistries.NPC_DATA) {
-            register(npcData.annotation().name(), npcData.clazz(), npcData.value(), INpcData.CODEC, INpcData.STREAM_CODEC);
+            register(npcData.annotation().name(), npcData.clazz(), npcData.value());
         }
     }
 
@@ -51,12 +48,12 @@ public class NpcAttachmentType {
         return name;
     }
 
-    private static void register(String name, Class<? extends INpcData> clazz, Supplier<INpcData> supplier, Codec<INpcData> codec, StreamCodec<ByteBuf, INpcData> streamCodec) {
+    private static void register(String name, Class<? extends INpcData> clazz, Supplier<INpcData> supplier) {
         DeferredHolder<AttachmentType<?>, AttachmentType<INpcData>> attachmentTypeDeferredHolder = ATTACHMENT_TYPES.register(
                 name,
                 () -> AttachmentType.builder(supplier)
-                        .serialize(codec)
-                        .sync(streamCodec)
+                        .serialize(INpcData.CODEC)
+                        .sync(INpcData.STREAM_CODEC)
                         .copyOnDeath()
                         .build()
         );
