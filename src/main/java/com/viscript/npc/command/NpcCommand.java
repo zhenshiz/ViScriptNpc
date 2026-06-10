@@ -1,12 +1,14 @@
 package com.viscript.npc.command;
 
-import com.lowdragmc.lowdraglib2.LDLib2;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.util.ViScriptNpcServerUtil;
+import com.viscript_lib.gui.editor.EditorAssetFiles;
+import com.viscript_lib.gui.editor.EditorFileFormat;
+import com.viscript_lib.register.ICommand;
 import lombok.SneakyThrows;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
@@ -23,16 +25,15 @@ import net.minecraft.world.phys.Vec3;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.List;
 
-@LDLRegister(name = "npc", registry = ICommand.ID)
+@LDLRegister(name = "npc", registry = ICommand.COMMAND_ID)
 public class NpcCommand implements ICommand {
     @Override
     public void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext buildContext, Commands.CommandSelection commandSelection) {
         dispatcher.register(Commands.literal(ViScriptNpc.MOD_ID).requires(commandSourceStack -> commandSourceStack.hasPermission(2))
                 .then(Commands.literal("summon")
-                        .then(Commands.argument("file", StringArgumentType.string())
+                        .then(Commands.argument("file", StringArgumentType.greedyString())
                                 .suggests(((context, builder) -> {
                                     getServerNpcFiles().forEach(builder::suggest);
                                     return builder.buildFuture();
@@ -43,7 +44,7 @@ public class NpcCommand implements ICommand {
                         )
                 )
                 .then(Commands.literal("editor").executes(this::openEditor)
-                        .then(Commands.argument("file", StringArgumentType.string())
+                        .then(Commands.argument("file", StringArgumentType.greedyString())
                                 .suggests(((context, builder) -> {
                                     getServerNpcFiles().forEach(builder::suggest);
                                     return builder.buildFuture();
@@ -53,27 +54,16 @@ public class NpcCommand implements ICommand {
         );
     }
 
+    public static final EditorFileFormat FORMAT = EditorFileFormat.of(ViScriptNpc.MOD_ID, "npc", "npc");
+
     static List<String> getServerNpcFiles() {
-        List<String> npcFiles = new ArrayList<>();
-        var assets = new File(LDLib2.getAssetsDir(), "viscript_npc/npc");
-        if (assets.exists() && assets.isDirectory()) {
-            try (var stream = Files.walk(assets.toPath())) {
-                stream.filter(Files::isRegularFile).forEach(file -> {
-                    String string = file.toString();
-                    if (string.endsWith(".npc")) {
-                        npcFiles.add("\"" + string.replace(assets.getPath(), "").substring(1).replace("\\", "/").replace(".npc", "") + "\"");
-                    }
-                });
-            } catch (IOException ignored) {
-            }
-        }
-        return npcFiles;
+        return EditorAssetFiles.listRuntimeFiles(FORMAT, true);
     }
 
     static File getNpcFile(String fileName) {
         if (fileName.startsWith("\"")) fileName = fileName.substring(1);
         if (fileName.endsWith("\"")) fileName = fileName.substring(0, fileName.length() - 1);
-        return new File(LDLib2.getAssetsDir(), "viscript_npc/npc/" + fileName + ".npc");
+        return EditorAssetFiles.resolveRuntimeFile(FORMAT, fileName, true).toFile();
     }
 
     static CompoundTag readNpcFile(File file) {

@@ -1,11 +1,12 @@
 package com.viscript.npc.util;
 
 import com.lowdragmc.lowdraglib2.configurator.ui.SearchComponentConfigurator;
+import com.lowdragmc.lowdraglib2.configurator.ui.StringConfigurator;
 import com.lowdragmc.lowdraglib2.gui.texture.ItemStackTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
 import com.lowdragmc.lowdraglib2.utils.search.IResultHandler;
-import com.viscript.npc.util.common.BeanUtil;
+import com.viscript_lib.util.BeanUtil;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -13,6 +14,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 
+import javax.annotation.Nonnull;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -80,5 +82,9 @@ public class ConfiguratorUtil {
                 (value) -> BeanUtil.getValueOrDefault(value, ""),
                 value -> new Label().setText(value)
         );
+    }
+
+    public static StringConfigurator ofResourceLocation(String name, Supplier<ResourceLocation> supplier, Consumer<ResourceLocation> onUpdate, @Nonnull ResourceLocation defaultValue, boolean forceUpdate) {
+        return new StringConfigurator(name, () -> supplier.get().toString(), s -> onUpdate.accept(ResourceLocation.parse(s)), defaultValue.toString(), forceUpdate).setResourceLocation(true);
     }
 }

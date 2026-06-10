@@ -49,6 +49,10 @@ repositories {
             includeGroup("com.eliotlash.mclib")
         }
     }
+
+    maven {
+        url "https://maven.sighs.cc/repository/maven-public/"
+    }
 }
 
 base {
@@ -125,6 +129,10 @@ modAccessor {
 dependencies {
     // LDLib2
     implementation("com.lowdragmc.ldlib2:ldlib2-neoforge-${minecraft_version}:${ldlib2_version}:all")
+    implementation("com.zhenshiz:ViScriptLib-neoforge-${minecraft_version}:${viscriptlib_version}") {
+        transitive = false
+    }
+    jarJar("com.zhenshiz:ViScriptLib-neoforge-${minecraft_version}:${viscriptlib_version}")
 
     // KubeJS
     implementation "dev.latvian.mods:rhino:${rhino_version}"

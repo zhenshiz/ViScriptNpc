@@ -4,12 +4,11 @@ import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.viscript.npc.npc.CustomNpc;
-import com.viscript.npc.npc.data.basics.setting.INpcRenderer;
-import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
-import com.viscript.npc.npc.data.dynamic.model.ModelPartConfig;
-import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
-import com.viscript.npc.npc.layer.CapeLayer;
-import com.viscript.npc.npc.layer.INpcAppearancePart;
+import com.viscript.npc.npc.data.basics_setting.INpcRenderer;
+import com.viscript.npc.npc.data.model.ModelPartConfig;
+import com.viscript.npc.npc.data.model.NpcDynamicModel;
+import com.viscript.npc.npc.render.layer.CapeLayer;
+import com.viscript.npc.npc.render.layer.INpcAppearancePart;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.model.HumanoidModel;
@@ -25,8 +24,12 @@ import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
 import net.minecraft.client.renderer.entity.layers.ItemInHandLayer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.CrossbowItem;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.UseAnim;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.ClientHooks;
 import org.jetbrains.annotations.Nullable;
@@ -37,6 +40,7 @@ import software.bernie.geckolib.cache.object.GeoBone;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
+@SuppressWarnings({"rawtypes", "UnstableApiUsage"})
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> extends LivingEntityRenderer<T, M> {
@@ -127,6 +131,7 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
         entity.walkDist = npc.walkDist;
         entity.walkDistO = npc.walkDistO;
         if (entity instanceof LivingEntity living) {
+            living.swimAmount = npc.swimAmount; living.swimAmountO = npc.swimAmountO;
             living.yHeadRotO = npc.yHeadRotO; living.yBodyRotO = npc.yBodyRotO;
             living.useItem = npc.useItem;
             living.useItemRemaining = npc.useItemRemaining;
@@ -154,6 +159,30 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
         }
     }
 
+    private static HumanoidModel.ArmPose getArmPose(LivingEntity entity, InteractionHand hand) {
+        ItemStack itemstack = entity.getItemInHand(hand);
+        if (itemstack.isEmpty()) {
+            return HumanoidModel.ArmPose.EMPTY;
+        } else {
+            if (entity.getUsedItemHand() == hand && entity.getUseItemRemainingTicks() > 0) {
+                UseAnim useanim = itemstack.getUseAnimation();
+                if (useanim == UseAnim.BLOCK) return HumanoidModel.ArmPose.BLOCK;
+                if (useanim == UseAnim.BOW) return HumanoidModel.ArmPose.BOW_AND_ARROW;
+                if (useanim == UseAnim.SPEAR) return HumanoidModel.ArmPose.THROW_SPEAR;
+                if (useanim == UseAnim.CROSSBOW && hand == entity.getUsedItemHand()) return HumanoidModel.ArmPose.CROSSBOW_CHARGE;
+                if (useanim == UseAnim.SPYGLASS) return HumanoidModel.ArmPose.SPYGLASS;
+                if (useanim == UseAnim.TOOT_HORN) return HumanoidModel.ArmPose.TOOT_HORN;
+                if (useanim == UseAnim.BRUSH) return HumanoidModel.ArmPose.BRUSH;
+            } else if (!entity.swinging && itemstack.getItem() instanceof CrossbowItem && CrossbowItem.isCharged(itemstack)) {
+                return HumanoidModel.ArmPose.CROSSBOW_HOLD;
+            }
+            HumanoidModel.ArmPose forgeArmPose = net.neoforged.neoforge.client.extensions.common.IClientItemExtensions.of(itemstack).getArmPose(entity, hand, itemstack);
+            if (forgeArmPose != null) return forgeArmPose;
+
+            return HumanoidModel.ArmPose.ITEM;
+        }
+    }
+
     @Override
     public void render(T npc, float entityYaw, float partialTicks, PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         Entity entity = npc.getNpcDynamicModel().getEntity(npc);
@@ -167,6 +196,10 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
             if (render instanceof INpcRenderer iRenderer) {
                 iRenderer.setSkinColor(color);
                 iRenderer.setDynamicModel(npc.getNpcDynamicModel());
+            }
+            if (render instanceof LivingEntityRenderer renderer && entity instanceof LivingEntity living && renderer.getModel() instanceof HumanoidModel<?> humanoidModel) {
+                humanoidModel.leftArmPose = getArmPose(living, InteractionHand.OFF_HAND);
+                humanoidModel.rightArmPose = getArmPose(living, InteractionHand.MAIN_HAND);
             }
             // 直接调用对应实体的渲染方法
             render.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
@@ -183,6 +216,8 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
             iRenderer.setSkinColor(color);
             iRenderer.setDynamicModel(npc.getNpcDynamicModel());
         }
+        model.leftArmPose = getArmPose(npc, InteractionHand.OFF_HAND);
+        model.rightArmPose = getArmPose(npc, InteractionHand.MAIN_HAND);
         super.render(npc, entityYaw, partialTicks, poseStack, buffer, packedLight);
         RenderSystem.setShaderColor(1, 1, 1, 1);
     }
@@ -201,7 +236,7 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
 
     @Override
     public ResourceLocation getTextureLocation(T t) {
-        return NpcBasicsSetting.SkinType.getSkinType(t.getNpcBasicsSetting());
+        return t.getNpcBasicsSetting().getSkinTexture();
     }
 
     public static void updateNpcModelPart(@Nullable NpcDynamicModel config, HumanoidModel<?> model, boolean restore) {

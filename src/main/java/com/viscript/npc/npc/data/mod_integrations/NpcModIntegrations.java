@@ -1,4 +1,4 @@
-package com.viscript.npc.npc.data.mod.integrations;
+package com.viscript.npc.npc.data.mod_integrations;
 
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.viscript.npc.npc.data.INpcData;

@@ -1,4 +1,4 @@
-package com.viscript.npc.npc.layer;
+package com.viscript.npc.npc.render.layer;
 
 import com.viscript.npc.npc.CustomNpc;
 

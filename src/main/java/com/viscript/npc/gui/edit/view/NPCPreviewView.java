@@ -22,7 +22,7 @@ import com.viscript.npc.gui.edit.data.ClientNpcConfig;
 import com.viscript.npc.gui.edit.data.NpcConfig;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.NpcRegister;
-import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
+import com.viscript.npc.npc.data.model.NpcDynamicModel;
 import dev.vfyjxf.taffy.style.FlexDirection;
 import lombok.Getter;
 import lombok.Setter;

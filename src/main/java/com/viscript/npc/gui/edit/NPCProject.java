@@ -16,7 +16,7 @@ import com.lowdragmc.lowdraglib2.syncdata.ISubscription;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.gui.edit.npc.NPC;
 import com.viscript.npc.network.c2s.C2SPayload;
-import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
+import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
 import lombok.Getter;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
