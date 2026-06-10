@@ -1,6 +1,6 @@
-package com.viscript.npc.npc.data.basics.setting;
+package com.viscript.npc.npc.data.basics_setting;
 
-import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
+import com.viscript.npc.npc.data.model.NpcDynamicModel;
 
 public interface INpcRenderer {
 

@@ -1,4 +1,4 @@
-package com.viscript.npc.npc.data.dynamic.model;
+package com.viscript.npc.npc.data.model;
 
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
@@ -11,7 +11,7 @@ import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.ConfiguratorUtil;
-import com.viscript.npc.util.common.BeanUtil;
+import com.viscript_lib.util.BeanUtil;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

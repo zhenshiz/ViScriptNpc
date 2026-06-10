@@ -1,4 +1,4 @@
-package com.viscript.npc.npc.data.basics.setting;
+package com.viscript.npc.npc.data.basics_setting;
 
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigColor;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
@@ -10,8 +10,8 @@ import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.npc.data.INpcData;
+import com.viscript.npc.util.ConfiguratorUtil;
 import com.viscript.npc.util.RenderUtil;
-import com.viscript.npc.util.common.StrUtil;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
@@ -46,11 +46,11 @@ public class NpcBasicsSetting implements INpcData {
     @ConfigSelector(subConfiguratorBuilder = "skinTypeSubConfiguratorBuilder")
     private SkinType skinType = SkinType.RESOURCE_PACK;
     @Persisted
-    private String textureLocation = "textures/entity/player/slim/steve.png";
+    private ResourceLocation textureLocation = ResourceLocation.withDefaultNamespace("textures/entity/player/slim/steve.png");
     @Persisted
     private String texturePlayerName = "";
     @Configurable(name = "npcConfig.npcBasicsSetting.capeTexture", tips = "npcConfig.npcBasicsSetting.capeTexture.tips")
-    private String capeTexture = ViScriptNpc.id("textures/default_cape.png").toString();
+    private ResourceLocation capeTexture = ViScriptNpc.id("textures/default_cape.png");
     @Configurable(name = "npcConfig.npcBasicsSetting.invulnerable")
     private boolean invulnerable = true;
     @Configurable(name = "npcConfig.npcBasicsSetting.isNoAI")
@@ -61,11 +61,17 @@ public class NpcBasicsSetting implements INpcData {
     public void skinTypeSubConfiguratorBuilder(SkinType skinType, ConfiguratorGroup group) {
         switch (skinType) {
             case RESOURCE_PACK ->
-                    group.addConfigurator(new StringConfigurator("npcConfig.npcBasicsSetting.textureLocation", this::getTextureLocation, this::setTextureLocation, textureLocation, true)
-                            .setResourceLocation(true));
+                    group.addConfigurator(ConfiguratorUtil.ofResourceLocation("npcConfig.npcBasicsSetting.textureLocation", this::getTextureLocation, this::setTextureLocation, textureLocation, true));
             case PLAYER_NAME ->
                     group.addConfigurator(new StringConfigurator("npcConfig.npcBasicsSetting.texturePlayerName", this::getTexturePlayerName, this::setTexturePlayerName, texturePlayerName, true));
         }
+    }
+
+    public ResourceLocation getSkinTexture() {
+        return switch (skinType) {
+            case RESOURCE_PACK -> textureLocation;
+            case PLAYER_NAME -> RenderUtil.getSkin(texturePlayerName).texture();
+        };
     }
 
     @Getter
@@ -79,14 +85,6 @@ public class NpcBasicsSetting implements INpcData {
         @Override
         public @NotNull String getSerializedName() {
             return name;
-        }
-
-        public static ResourceLocation getSkinType(NpcBasicsSetting npcBasicsSetting) {
-            return switch (npcBasicsSetting.skinType) {
-                case RESOURCE_PACK ->
-                        ResourceLocation.tryParse(StrUtil.cleanResource(npcBasicsSetting.textureLocation));
-                case PLAYER_NAME -> RenderUtil.getSkin(npcBasicsSetting.texturePlayerName).texture();
-            };
         }
     }
 }

@@ -13,8 +13,6 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.slf4j.Logger;
 
 import java.util.function.Consumer;
@@ -25,17 +23,9 @@ public class ViScriptNpc {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public ViScriptNpc(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
-        NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
         NpcRegister.ENTITY_TYPES.register(modEventBus);
         NpcAttachmentType.ATTACHMENT_TYPES.register(modEventBus);
         executePluginMethod(IViScriptNpcPlugin::init);
-    }
-
-    //注册指令
-    private void onRegisterCommands(RegisterCommandsEvent event) {
-        for (var command : ViScriptNpcRegistries.COMMANDS) {
-            command.value().get().register(event.getDispatcher(), event.getBuildContext(), event.getCommandSelection());
-        }
     }
 
     public static ResourceLocation id(String path) {

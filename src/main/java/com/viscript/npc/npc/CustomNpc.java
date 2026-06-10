@@ -11,12 +11,11 @@ import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
 import com.viscript.npc.npc.data.attributes.ResistanceConfig;
-import com.viscript.npc.npc.data.basics.setting.NpcBasicsSetting;
-import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
+import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
 import com.viscript.npc.npc.data.inventory.LootTableConfig;
 import com.viscript.npc.npc.data.inventory.NpcInventory;
-import com.viscript.npc.npc.data.mod.integrations.NpcModIntegrations;
-import com.viscript.npc.util.common.StrUtil;
+import com.viscript.npc.npc.data.mod_integrations.NpcModIntegrations;
+import com.viscript.npc.npc.data.model.NpcDynamicModel;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -36,9 +35,12 @@ import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.monster.RangedAttackMob;
+import net.minecraft.world.entity.ai.goal.*;
+import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
+import net.minecraft.world.entity.ai.navigation.WaterBoundPathNavigation;
+import net.minecraft.world.entity.monster.CrossbowAttackMob;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.*;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -50,6 +52,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.CommonHooks;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import net.neoforged.neoforge.event.OnDatapackSyncEvent;
@@ -60,11 +63,14 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
-public class CustomNpc extends PathfinderMob implements RangedAttackMob {
+public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
+    protected final WaterBoundPathNavigation waterNavigation;
+    protected final GroundPathNavigation groundNavigation;
     public static Set<String> lootTableKeys = Set.of();
 
     //披风用参数
@@ -84,6 +90,8 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     public CustomNpc(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
 //        mind = new MindMachine(this);
+        this.waterNavigation = new WaterBoundPathNavigation(this, level);
+        this.groundNavigation = new GroundPathNavigation(this, level);
     }
 
     public <T extends INpcData> T getNpcAttachment(Class<T> clazz) {
@@ -93,44 +101,107 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
     @Override
     protected void registerGoals() {
 /*        this.goalSelector.addGoal(0, new FloatGoal(this));
+        this.goalSelector.addGoal(3, new RangedAttackGoal(this, 1.0, 40, 15) {
+            @Override
+            public boolean canUse() {return super.canUse() && isHolding(stack -> stack.getItem() instanceof TridentItem);}
+
+            @Override
+            public void start() {
+                setAggressive(true);
+                startUsingItem(InteractionHand.MAIN_HAND);
+            }
+
+            @Override
+            public void stop() {
+                super.stop();
+                stopUsingItem();
+                setAggressive(false);
+            }
+        });
+        this.goalSelector.addGoal(3, new RangedCrossbowAttackGoal<>(this, 1.0, 15));
         this.goalSelector.addGoal(3, new RangedBowAttackGoal<>(this, 1.0F, 20, 15.0F));
         this.goalSelector.addGoal(4, new MeleeAttackGoal(this, 1.0, false));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Zombie.class, true));
+        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, IronGolem.class, true));
         this.goalSelector.addGoal(6, new WaterAvoidingRandomStrollGoal(this, 1.0F));
         this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 10.0f));
         this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));*/
     }
 
     @Override
-    public void performRangedAttack(LivingEntity target, float v) {
-/*        ItemStack weapon = this.getItemInHand(ProjectileUtil.getWeaponHoldingHand(this, (item) -> item instanceof BowItem));
-        ItemStack itemstack1 = this.getProjectile(weapon);
-        AbstractArrow abstractarrow = ((ArrowItem) Items.ARROW).createArrow(level(), new ItemStack(Items.ARROW), this, weapon);
-        Item var7 = weapon.getItem();
-        if (var7 instanceof ProjectileWeaponItem weaponItem) {
-            abstractarrow = weaponItem.customArrow(abstractarrow, itemstack1, weapon);
-        }
+    public void setChargingCrossbow(boolean b) {}
 
-        double d0 = target.getX() - this.getX();
-        double d1 = target.getY(0.3333333333333333) - abstractarrow.getY();
-        double d2 = target.getZ() - this.getZ();
-        double d3 = Math.sqrt(d0 * d0 + d2 * d2);
-        abstractarrow.shoot(d0, d1 + d3 * (double)0.2F, d2, 1.6F, (float)(14 - this.level().getDifficulty().getId() * 4));
-        this.playSound(SoundEvents.SKELETON_SHOOT, 1.0F, 1.0F / (this.getRandom().nextFloat() * 0.4F + 0.8F));
-        this.level().addFreshEntity(abstractarrow);*/
+    @Override
+    public void onCrossbowAttackPerformed() {this.noActionTime = 0;}
+
+    private ItemStack getHoldingWeapon() {
+        Predicate<ItemStack> p = stack -> {
+            Item item = stack.getItem();
+            return item instanceof TridentItem || item instanceof CrossbowItem || item instanceof BowItem;
+        };
+        return p.test(getMainHandItem()) ? getMainHandItem() : p.test(getOffhandItem()) ? getOffhandItem() : ItemStack.EMPTY;
+    }
+
+    @Override
+    public ItemStack getProjectile(ItemStack weapon) {
+        if (weapon.getItem() instanceof ProjectileWeaponItem weaponItem) {
+            var ammo = ProjectileWeaponItem.getHeldProjectile(this, weaponItem.getSupportedHeldProjectiles(weapon));
+            return CommonHooks.getProjectile(this, weapon, ammo.isEmpty() ? new ItemStack(Items.ARROW) : ammo);
+        } else return CommonHooks.getProjectile(this, weapon, ItemStack.EMPTY);
+    }
+
+    @Override
+    public void performRangedAttack(LivingEntity target, float v) {
+/*        ItemStack weapon = getHoldingWeapon();
+        switch (weapon.getItem()) {
+            case BowItem bow -> {
+                AbstractArrow abstractarrow = ((ArrowItem) Items.ARROW).createArrow(level(), new ItemStack(Items.ARROW), this, weapon);
+                abstractarrow = bow.customArrow(abstractarrow, getProjectile(weapon), weapon);
+
+                double d0 = target.getX() - getX();
+                double d1 = target.getY(0.3333333333333333) - abstractarrow.getY();
+                double d2 = target.getZ() - getZ();
+                double d3 = Math.sqrt(d0 * d0 + d2 * d2);
+                abstractarrow.shoot(d0, d1 + d3 * 0.2, d2, 1.6F, 14f - level().getDifficulty().getId() * 4);
+                playSound(SoundEvents.SKELETON_SHOOT, 1.0F, 1.0F / (getRandom().nextFloat() * 0.4F + 0.8F));
+                level().addFreshEntity(abstractarrow);
+            }
+            case CrossbowItem ignored -> performCrossbowAttack(this, 1.6F);
+            case TridentItem ignored -> {
+                ThrownTrident throwntrident = new ThrownTrident(level(), this, new ItemStack(Items.TRIDENT));
+                double d0 = target.getX() - getX();
+                double d1 = target.getY(0.3333333333333333) - throwntrident.getY();
+                double d2 = target.getZ() - getZ();
+                double d3 = Math.sqrt(d0 * d0 + d2 * d2);
+                throwntrident.shoot(d0, d1 + d3 * 0.2, d2, 1.6F, 14f - level().getDifficulty().getId() * 4);
+                playSound(SoundEvents.DROWNED_SHOOT, 1.0F, 1.0F / (getRandom().nextFloat() * 0.4F + 0.8F));
+                level().addFreshEntity(throwntrident);
+            }
+            default -> {}
+        }*/
+    }
+
+    public void updateSwimming() { // 临时的
+        if (!this.level().isClientSide) {
+            if (this.isEffectiveAi() && this.isInWater()) {
+                this.navigation = this.waterNavigation;
+                this.setSwimming(true);
+                setPose(Pose.SWIMMING);
+            } else {
+                this.navigation = this.groundNavigation;
+                this.setSwimming(false);
+                setPose(Pose.STANDING);
+            }
+        }
     }
 
     @Override
     public void tick() {
         super.tick();
-        this.moveCloak();
-        if (this.level() instanceof ServerLevel) {
-            NeoForge.EVENT_BUS.post(new NpcEvent.Tick(this));
-        }
-
+        NeoForge.EVENT_BUS.post(new NpcEvent.Tick(this));
         // MindMachine
 //        mind.tick();
         if (level().isClientSide()) {
+            this.moveCloak();
             Entity entity = getNpcDynamicModel().getEntity(this);
             try { // 某些生物的AI会导致奇怪的崩溃
                 if (entity != null) entity.tick();
@@ -141,6 +212,7 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
 
     @Override
     public void aiStep() {
+        updateSwingTime();
         super.aiStep();
         // 用于披风渲染
         this.oBob = this.bob;
@@ -240,7 +312,7 @@ public class CustomNpc extends PathfinderMob implements RangedAttackMob {
         NpcAttachmentType.getAttachmentClasses().forEach(clazz -> {
             INpcData npcAttachment = this.getNpcAttachment(clazz);
             npcAttachment.deserializeNBT(Platform.getFrozenRegistry(),
-                    compoundTag.getCompound(StrUtil.toCamelCase(NpcAttachmentType.getAttachmentName(clazz))));
+                    compoundTag.getCompound(NpcAttachmentType.getAttachmentName(clazz)));
         });
         updateNpcState();
     }

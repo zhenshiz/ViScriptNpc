@@ -1,4 +1,4 @@
-package com.viscript.npc.npc.data.dynamic.model;
+package com.viscript.npc.npc.data.model;
 
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;

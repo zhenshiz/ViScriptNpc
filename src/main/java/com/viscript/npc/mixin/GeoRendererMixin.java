@@ -2,8 +2,8 @@ package com.viscript.npc.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.viscript.npc.npc.data.basics.setting.INpcRenderer;
-import com.viscript.npc.npc.data.dynamic.model.NpcDynamicModel;
+import com.viscript.npc.npc.data.basics_setting.INpcRenderer;
+import com.viscript.npc.npc.data.model.NpcDynamicModel;
 import com.viscript.npc.npc.render.CustomNpcRender;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
