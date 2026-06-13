@@ -5,6 +5,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.viscript.npc.ViScriptNpc;
+import com.viscript.npc.util.NpcEditorFormats;
 import com.viscript.npc.util.ViScriptNpcServerUtil;
 import com.viscript_lib.gui.editor.EditorAssetFiles;
 import com.viscript_lib.gui.editor.EditorFileFormat;
@@ -54,7 +55,7 @@ public class NpcCommand implements ICommand {
         );
     }
 
-    public static final EditorFileFormat FORMAT = EditorFileFormat.of(ViScriptNpc.MOD_ID, "npc", "npc");
+    public static final EditorFileFormat FORMAT = NpcEditorFormats.NPC;
 
     static List<String> getServerNpcFiles() {
         return EditorAssetFiles.listRuntimeFiles(FORMAT, true);

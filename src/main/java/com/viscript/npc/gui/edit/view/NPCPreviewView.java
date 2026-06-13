@@ -1,6 +1,7 @@
 package com.viscript.npc.gui.edit.view;
 
 import com.lowdragmc.lowdraglib2.Platform;
+import com.lowdragmc.lowdraglib2.client.scene.ISceneEntityRenderHook;
 import com.lowdragmc.lowdraglib2.client.utils.RenderBufferUtils;
 import com.lowdragmc.lowdraglib2.editor.ui.View;
 import com.lowdragmc.lowdraglib2.editor.ui.sceneeditor.SceneEditor;
@@ -20,6 +21,7 @@ import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.gui.edit.components.SceneToggleBuilder;
 import com.viscript.npc.gui.edit.data.ClientNpcConfig;
 import com.viscript.npc.gui.edit.data.NpcConfig;
+import com.viscript.npc.mixin.WorldSceneRendererAccessor;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.NpcRegister;
 import com.viscript.npc.npc.data.model.NpcDynamicModel;
@@ -35,11 +37,14 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.NotNull;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
 
 @Getter
-public class NPCPreviewView extends View {
+public class NPCPreviewView extends View implements INpcEditorSlotView {
+    private static final float MIN_COLLISION_BOX_SIZE = 0.01f;
+
     public final NpcEditor editor;
     public final NpcSceneEditor sceneEditor;
     public final TrackedDummyWorld level = new TrackedDummyWorld();
@@ -67,7 +72,24 @@ public class NPCPreviewView extends View {
                 .createScene(level)
                 .setTickWorld(true)
                 .useCacheBuffer();
+        if (sceneEditor.scene.getRenderer() != null) {
+            sceneEditor.scene.getRenderer().setSceneEntityRenderHook(new ISceneEntityRenderHook() {
+                @Override
+                public void applyEntity(net.minecraft.world.level.Level world, Entity entity, PoseStack poseStack, float partialTicks) {
+                    if (entity == customNpc && customNpc != null) {
+                        customNpc.setPreviewCameraOrientation(sceneEditor.getPreviewCameraOrientation());
+                    }
+                }
+            });
+        }
         this.addChild(sceneEditor);
+    }
+
+    @Override
+    public void onViewSelected(NpcEditor editor, NPCProject project, com.viscript.npc.gui.edit.page.INpcEditorPage page) {
+        if (!isSceneLoaded()) {
+            loadScene();
+        }
     }
 
     public void loadScene() {
@@ -87,22 +109,55 @@ public class NPCPreviewView extends View {
         if (editor.getCurrentProject() instanceof NPCProject npcProject) {
             ClientNpcConfig npcConfig = new ClientNpcConfig(npcProject.npc.npcConfig);
             AABB aabb = npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
-            npcConfig.transform.scale(new Vector3f((float) aabb.getXsize(), (float) aabb.getYsize(), (float) aabb.getZsize()));
+            npcConfig.transform.scale(collisionBoxGizmoScale(aabb));
 
-            npcConfig.transform().position(customNpc.position().toVector3f().add(0, 1, 0));
+            npcConfig.transform().position(collisionBoxGizmoPosition(aabb));
             sceneEditor.addSceneObject(npcConfig);
             sceneEditor.setTransformGizmoTarget(npcConfig.transform(), () -> {
-                Vector3f position = npcConfig.transform().position();
-                customNpc.setPos(position.x, position.y - 1, position.z);
-                Vector3f scale = npcConfig.transform().scale();
-                npcConfig.getNpcData(NpcDynamicModel.class).setAabb(AABB.ofSize(customNpc.position(), scale.x, scale.y, scale.z));
+                applyCollisionBoxTransform(npcConfig);
                 editor.historyView.recordSerializableObject(Component.translatable("npcObject.transform"), npcConfig.transform(), npcConfig);
             });
         }
         isSceneLoaded = true;
     }
 
+    private Vector3f collisionBoxGizmoPosition(AABB aabb) {
+        return customNpc.position().toVector3f().add(
+                (float) ((aabb.minX + aabb.maxX) * 0.5D),
+                (float) aabb.minY,
+                (float) ((aabb.minZ + aabb.maxZ) * 0.5D)
+        );
+    }
+
+    private Vector3f collisionBoxGizmoScale(AABB aabb) {
+        return new Vector3f(
+                (float) Math.max(MIN_COLLISION_BOX_SIZE, aabb.getXsize()),
+                (float) Math.max(MIN_COLLISION_BOX_SIZE, aabb.getYsize()),
+                (float) Math.max(MIN_COLLISION_BOX_SIZE, aabb.getZsize())
+        );
+    }
+
+    private void applyCollisionBoxTransform(ClientNpcConfig npcConfig) {
+        NpcDynamicModel dynamicModel = npcConfig.getNpcData(NpcDynamicModel.class);
+        AABB currentAabb = dynamicModel.getAabb();
+        Vector3f position = npcConfig.transform().position();
+        Vector3f scale = npcConfig.transform().scale();
+        double width = Math.max(MIN_COLLISION_BOX_SIZE, scale.x);
+        double height = Math.max(MIN_COLLISION_BOX_SIZE, scale.y);
+        double depth = Math.max(MIN_COLLISION_BOX_SIZE, scale.z);
+        double centerX = position.x - customNpc.getX();
+        double centerZ = position.z - customNpc.getZ();
+
+        dynamicModel.setAabb(new AABB(
+                centerX - width * 0.5D, currentAabb.minY, centerZ - depth * 0.5D,
+                centerX + width * 0.5D, currentAabb.minY + height, centerZ + depth * 0.5D
+        ));
+        npcConfig.transform().position(new Vector3f(position.x, (float) (customNpc.getY() + currentAabb.minY), position.z));
+        npcConfig.transform().scale(collisionBoxGizmoScale(dynamicModel.getAabb()));
+    }
+
     public void clearScene() {
+        customNpc.setPreviewCameraOrientation(null);
         level.clear();
         isSceneLoaded = false;
     }
@@ -112,6 +167,14 @@ public class NPCPreviewView extends View {
 
         public NPCPreviewView sceneView() {
             return NPCPreviewView.this;
+        }
+
+        private Quaternionf getPreviewCameraOrientation() {
+            var renderer = scene.getRenderer();
+            if (renderer == null) {
+                return new Quaternionf();
+            }
+            return ((WorldSceneRendererAccessor) renderer).viscript_npc$getCamera().rotation();
         }
 
         @Override
@@ -149,10 +212,11 @@ public class NPCPreviewView extends View {
                     RenderSystem.setShader(GameRenderer::getRendertypeLinesShader);
                     var buffer = Tesselator.getInstance().begin(VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL);
                     RenderSystem.lineWidth(3);
+                    float baseY = customNpc == null ? 1.0F : (float) customNpc.getY();
 
                     RenderBufferUtils.drawCubeFrame(new PoseStack(), buffer,
-                            (float) cullBox.minX, (float) cullBox.minY + 1, (float) cullBox.minZ,
-                            (float) cullBox.maxX, (float) cullBox.maxY + 1, (float) cullBox.maxZ,
+                            (float) cullBox.minX, (float) cullBox.minY + baseY, (float) cullBox.minZ,
+                            (float) cullBox.maxX, (float) cullBox.maxY + baseY, (float) cullBox.maxZ,
                             1, 1, 1, 1);
 
                     BufferUploader.drawWithShader(buffer.buildOrThrow());

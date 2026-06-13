@@ -3,6 +3,8 @@ package com.viscript.npc.npc.render;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.viscript.npc.ViScriptNpc;
+import com.viscript.npc.compat.curios.NpcCuriosRenderCompat;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.basics_setting.INpcRenderer;
 import com.viscript.npc.npc.data.model.ModelPartConfig;
@@ -34,6 +36,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.ClientHooks;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
 import software.bernie.geckolib.cache.object.GeoBone;
@@ -44,6 +47,9 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> extends LivingEntityRenderer<T, M> {
+    private static final float NAME_TAG_VERTICAL_PADDING = 0.5f;
+    private static final float NAME_TAG_SCALE = 0.02f;
+    private static final float TITLE_LINE_Y = 10f;
 
     public CustomNpcRender(EntityRendererProvider.Context context, M model) {
         super(context, model, 0.5f);
@@ -56,12 +62,15 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
                 new HumanoidModel<>(context.bakeLayer(ModelLayers.PLAYER_OUTER_ARMOR)),
                 context.getModelManager()
         ));
+        if (ViScriptNpc.isCuriosLoaded()) {
+            addLayer(NpcCuriosRenderCompat.createLayer(this));
+        }
     }
 
     @Override
     protected void renderNameTag(T npc, Component displayName, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, float partialTick) {
         if (this.shouldShowName(npc) && ClientHooks.isNameplateInRenderDistance(npc, this.entityRenderDispatcher.distanceToSqr(npc)) && npc.getNpcBasicsSetting().isNameVisible()) {
-            Vec3 vec3 = npc.getAttachments().getNullable(EntityAttachment.NAME_TAG, 0, npc.getViewYRot(partialTick));
+            Vec3 vec3 = getNpcNameTagPosition(npc, partialTick);
             if (vec3 != null) {
                 boolean seeThrough = !npc.isDiscrete();
                 poseStack.pushPose();
@@ -69,15 +78,14 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
                 // 获取实体缩放
                 float scale = (float) npc.getAttributeValue(Attributes.SCALE);
 
-                // 名字位置偏移
-                float yOffset = npc.getBbHeight() * 0.2f;
-                poseStack.translate(vec3.x, vec3.y + yOffset, vec3.z);
+                poseStack.translate(vec3.x, vec3.y + NAME_TAG_VERTICAL_PADDING, vec3.z);
 
                 // 始终面向摄像机
-                poseStack.mulPose(this.entityRenderDispatcher.cameraOrientation());
+                Quaternionf previewCameraOrientation = npc.getPreviewCameraOrientation();
+                poseStack.mulPose(previewCameraOrientation != null ? previewCameraOrientation : this.entityRenderDispatcher.cameraOrientation());
 
                 // 缩放名字
-                float nameScale = 0.02f * scale;
+                float nameScale = NAME_TAG_SCALE * scale;
                 poseStack.scale(nameScale, -nameScale, nameScale);
 
                 Matrix4f matrix4f = poseStack.last().pose();
@@ -101,7 +109,7 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
                 if (!titleStr.getString().isEmpty()) {
                     Component title = Component.literal("<").append(titleStr).append(">");
                     float titleX = -font.width(title) / 2f;
-                    float titleY = 10f;
+                    float titleY = TITLE_LINE_Y;
                     font.drawInBatch(title, titleX, titleY, 553648127, false, matrix4f, bufferSource,
                             seeThrough ? Font.DisplayMode.SEE_THROUGH : Font.DisplayMode.NORMAL, bgColor, packedLight);
                     if (seeThrough) {
@@ -112,6 +120,16 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
                 poseStack.popPose();
             }
         }
+    }
+
+    @Nullable
+    private static Vec3 getNpcNameTagPosition(CustomNpc npc, float partialTick) {
+        Vec3 attached = npc.getAttachments().getNullable(EntityAttachment.NAME_TAG, 0, npc.getViewYRot(partialTick));
+        double height = npc.getBbHeight();
+        if (attached == null) {
+            return new Vec3(0, height, 0);
+        }
+        return attached.y < height ? new Vec3(attached.x, height, attached.z) : attached;
     }
 
     // 用于实体模型、动画的渲染。你问我到底哪些参数有用？我也不知道
@@ -202,7 +220,10 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
                 humanoidModel.rightArmPose = getArmPose(living, InteractionHand.MAIN_HAND);
             }
             // 直接调用对应实体的渲染方法
-            render.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
+            if (!ViScriptNpc.isCuriosLoaded()
+                    || !NpcCuriosRenderCompat.renderDynamicModelWithCurios(npc, entity, render, entityYaw, partialTicks, poseStack, buffer, packedLight)) {
+                render.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
+            }
             entityRender(npc, partialTicks, poseStack, buffer, packedLight);
             return;
         }

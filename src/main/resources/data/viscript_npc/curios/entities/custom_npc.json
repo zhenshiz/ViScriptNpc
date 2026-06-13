@@ -1,0 +1,17 @@
+{
+  "entities": [
+    "viscript_npc:custom_npc"
+  ],
+  "slots": [
+    "back",
+    "belt",
+    "body",
+    "bracelet",
+    "charm",
+    "hands",
+    "head",
+    "necklace",
+    "ring",
+    "curio"
+  ]
+}

@@ -3,8 +3,10 @@ package com.viscript.npc.npc.data.attributes;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
+import com.viscript.npc.gui.edit.page.NpcEditorPageIds;
 import com.viscript.npc.npc.data.INpcData;
 import lombok.Data;
+import net.minecraft.resources.ResourceLocation;
 
 @Data
 @LDLRegister(name = "npc_attributes", registry = INpcData.ID)
@@ -60,4 +62,8 @@ public class NpcAttributes implements INpcData {
     @ConfigNumber(range = {0, Integer.MAX_VALUE}, wheel = 0.1)
     private float outOfCombatRegenRate = 0;
 
+    @Override
+    public ResourceLocation getEditorPage() {
+        return NpcEditorPageIds.ATTRIBUTES;
+    }
 }

@@ -9,7 +9,9 @@
   ],
   "client": [
     "GeoRendererMixin",
-    "LivingEntityRenderMixin"
+    "LivingEntityRenderMixin",
+    "LivingEntityRendererAccessor",
+    "WorldSceneRendererAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

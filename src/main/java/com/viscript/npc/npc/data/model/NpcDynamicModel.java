@@ -8,6 +8,7 @@ import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.viscript.npc.ViScriptNpc;
+import com.viscript.npc.gui.edit.page.NpcEditorPageIds;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.ConfiguratorUtil;
@@ -59,6 +60,11 @@ public class NpcDynamicModel implements INpcData {
     //缓存的生物，用于让npc展示其模型和材质
     private Entity entity;
     private ResourceLocation tempEntityType;
+
+    @Override
+    public ResourceLocation getEditorPage() {
+        return NpcEditorPageIds.RENDER;
+    }
 
     public static CompoundTag tagFromString(String nbt) {
         StringReader reader = new StringReader(nbt);

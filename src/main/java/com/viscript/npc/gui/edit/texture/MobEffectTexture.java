@@ -12,18 +12,17 @@ import net.minecraft.world.effect.MobEffect;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
-@LDLRegisterClient(
-        name = "mob_effect_texture",
-        registry = "ldlib2:gui_texture"
-)
+@LDLRegisterClient(name = "mob_effect_texture", registry = "ldlib2:gui_texture")
 public class MobEffectTexture extends TransformTexture {
+    private static final ResourceLocation DEFAULT_EFFECT = ResourceLocation.withDefaultNamespace("slowness");
+
     public MobEffect[] mobEffects;
     private int index;
     private int ticks;
     private long lastTick;
 
     public MobEffectTexture() {
-        this(BuiltInRegistries.MOB_EFFECT.get(ResourceLocation.withDefaultNamespace("slowness")));
+        this(BuiltInRegistries.MOB_EFFECT.get(DEFAULT_EFFECT));
     }
 
     public MobEffectTexture(MobEffect... effects) {
@@ -34,6 +33,7 @@ public class MobEffectTexture extends TransformTexture {
 
     public MobEffectTexture setEffects(MobEffect... effects) {
         this.mobEffects = effects;
+        this.index = 0;
         return this;
     }
 
@@ -41,9 +41,7 @@ public class MobEffectTexture extends TransformTexture {
     public void updateTick() {
         if (Minecraft.getInstance().level != null) {
             long tick = Minecraft.getInstance().level.getGameTime();
-            if (tick == this.lastTick) {
-                return;
-            }
+            if (tick == this.lastTick) return;
             this.lastTick = tick;
             if (this.mobEffects.length > 1 && ++this.ticks % 20 == 0 && ++this.index == this.mobEffects.length) {
                 this.index = 0;
@@ -51,21 +49,24 @@ public class MobEffectTexture extends TransformTexture {
         }
     }
 
+    @Override
     @OnlyIn(Dist.CLIENT)
     protected void drawInternal(GuiGraphics graphics, float mouseX, float mouseY, float x, float y, float width, float height, float partialTicks) {
         if (this.mobEffects == null || this.mobEffects.length == 0) return;
+        updateTick();
+        if (this.index >= this.mobEffects.length) {
+            this.index = 0;
+        }
 
-        this.updateTick();
+        MobEffect effect = this.mobEffects[this.index];
+        if (effect == null) return;
+
+        Holder<MobEffect> effectHolder = BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect);
+        TextureAtlasSprite sprite = Minecraft.getInstance().getMobEffectTextures().get(effectHolder);
         graphics.pose().pushPose();
         graphics.pose().scale(width / 18.0F, height / 18.0F, 1.0F);
         graphics.pose().translate(x * 18.0F / width, y * 18.0F / height, 0);
-
-        MobEffect effect = this.mobEffects[this.index];
-        Holder<MobEffect> effectHolder = BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect);
-        TextureAtlasSprite textureAtlasSprite = Minecraft.getInstance().getMobEffectTextures().get(effectHolder);
-
-        graphics.blit(0, 0, 0, 18, 18, textureAtlasSprite);
-
+        graphics.blit(0, 0, 0, 18, 18, sprite);
         graphics.pose().popPose();
     }
 }

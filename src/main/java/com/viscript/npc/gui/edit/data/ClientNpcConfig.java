@@ -26,6 +26,7 @@ public class ClientNpcConfig extends NpcConfig implements ISceneObject {
     }
 
     public ClientNpcConfig(NpcConfig config) {
+        npcData.clear();
         npcData.addAll(config.npcData);
     }
 }

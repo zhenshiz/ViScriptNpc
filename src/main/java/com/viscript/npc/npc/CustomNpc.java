@@ -5,6 +5,7 @@ import com.lowdragmc.lowdraglib2.math.Range;
 import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
+import com.viscript.npc.compat.curios.NpcCuriosCompat;
 import com.viscript.npc.event.neoforge.NpcEvent;
 import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.data.INpcData;
@@ -60,6 +61,8 @@ import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.*;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import org.jetbrains.annotations.Nullable;
+import org.joml.Quaternionf;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Set;
@@ -82,6 +85,8 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     public double zCloak;
     public float oBob;
     public float bob;
+    @Nullable
+    private Quaternionf previewCameraOrientation;
 
 //    // MindMachine
 //    @Getter
@@ -96,6 +101,15 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
 
     public <T extends INpcData> T getNpcAttachment(Class<T> clazz) {
         return clazz.cast(this.getData(NpcAttachmentType.getAttachment(clazz)));
+    }
+
+    public void setPreviewCameraOrientation(@Nullable Quaternionf previewCameraOrientation) {
+        this.previewCameraOrientation = previewCameraOrientation == null ? null : new Quaternionf(previewCameraOrientation);
+    }
+
+    @Nullable
+    public Quaternionf getPreviewCameraOrientation() {
+        return previewCameraOrientation;
     }
 
     @Override
@@ -346,6 +360,9 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
 
 
         //联动模组
+        if (ViScriptNpc.isCuriosLoaded()) {
+            NpcCuriosCompat.applyCurios(this);
+        }
     }
 
     @Override

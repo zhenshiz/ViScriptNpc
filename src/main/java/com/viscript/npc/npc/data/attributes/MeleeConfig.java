@@ -3,12 +3,13 @@ package com.viscript.npc.npc.data.attributes;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigNumber;
 import com.lowdragmc.lowdraglib2.configurator.annotation.ConfigSelector;
 import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
+import com.lowdragmc.lowdraglib2.configurator.ui.RegistrySearchComponent;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.configurator.ui.NumberConfigurator;
 import com.lowdragmc.lowdraglib2.configurator.ui.SearchComponentConfigurator;
 import com.lowdragmc.lowdraglib2.gui.ui.utils.UIElementProvider;
+import com.lowdragmc.lowdraglib2.utils.LocalizationUtils;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
-import com.lowdragmc.lowdraglib2.utils.search.IResultHandler;
 import com.viscript.npc.gui.edit.texture.MobEffectTexture;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.INpcData;
@@ -21,7 +22,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
-import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import org.jetbrains.annotations.NotNull;
 
@@ -29,6 +29,8 @@ import java.util.Objects;
 
 @Data
 public class MeleeConfig implements INpcData {
+    private static final ResourceLocation DEFAULT_DEBUFF_EFFECT = ResourceLocation.withDefaultNamespace("slowness");
+
     @Configurable(name = "npcConfig.npcAttributes.meleeConfig.attackDamage")
     @ConfigNumber(range = {0, 2048}, wheel = 0.1)
     private double attackDamage = 2;
@@ -45,7 +47,7 @@ public class MeleeConfig implements INpcData {
     @ConfigSelector(subConfiguratorBuilder = "additionalEffectsSubConfiguratorBuilder")
     private AdditionalEffects additionalEffects = AdditionalEffects.NONE;
     @Persisted
-    private String debuffEffect = MobEffects.SLOW_FALLING.getRegisteredName();
+    private String debuffEffect = DEFAULT_DEBUFF_EFFECT.toString();
     @Persisted
     private Number seconds = 0;
     @Persisted
@@ -73,41 +75,28 @@ public class MeleeConfig implements INpcData {
     }
 
     private SearchComponentConfigurator<MobEffect> createMobEffectSearchComponentConfigurator() {
-        SearchComponentConfigurator<MobEffect> mobEffectSearchComponentConfigurator = new SearchComponentConfigurator<>("npcConfig.npcAttributes.meleeConfig.debuffEffect",
-                () -> BuiltInRegistries.MOB_EFFECT.get(ResourceLocation.parse(debuffEffect)),
-                effect -> {
-                    ResourceLocation key = BuiltInRegistries.MOB_EFFECT.getKey(effect);
-                    if (key != null) debuffEffect = key.toString();
-                },
-                Objects.requireNonNull(BuiltInRegistries.MOB_EFFECT.get(ResourceLocation.parse(debuffEffect))),
+        RegistrySearchComponent<MobEffect> configurator = new RegistrySearchComponent<>(
+                "npcConfig.npcAttributes.meleeConfig.debuffEffect",
+                this::getDebuffEffectValue,
+                effect -> debuffEffect = Objects.toString(BuiltInRegistries.MOB_EFFECT.getKey(effect), DEFAULT_DEBUFF_EFFECT.toString()),
+                getDebuffEffectValue(),
                 false,
-                (word, searchHandler) -> {
-                    String lowerWord = word.toLowerCase();
-                    for (var key : BuiltInRegistries.MOB_EFFECT.keySet()) {
-                        if (Thread.currentThread().isInterrupted()) return;
-                        MobEffect mobEffect = BuiltInRegistries.MOB_EFFECT.get(key);
-                        if (mobEffect != null && !mobEffect.isBeneficial() && (key.toString().toLowerCase().contains(lowerWord) || Component.translatable(mobEffect.getDescriptionId()).getString().toLowerCase().contains(lowerWord))) {
-                            ((IResultHandler<MobEffect>) searchHandler).acceptResult(BuiltInRegistries.MOB_EFFECT.get(key));
-                        }
-                    }
-                },
-                (value) -> {
-                    ResourceLocation key = BuiltInRegistries.MOB_EFFECT.getKey(value);
-                    if (key != null) {
-                        return key.toString();
-                    }
-                    return "";
-                },
-                value -> {
-                    UIElementProvider<MobEffect> mobEffectUIElementProvider = UIElementProvider.iconText(
-                            MobEffectTexture::new,
-                            effect -> Component.translatable(effect.getDescriptionId())
-                    );
-                    return mobEffectUIElementProvider.createUI(value);
-                }
+                BuiltInRegistries.MOB_EFFECT,
+                UIElementProvider.iconText(
+                        MobEffectTexture::new,
+                        effect -> Component.translatable(effect.getDescriptionId())
+                )
         );
-        mobEffectSearchComponentConfigurator.setTips("npcConfig.npcAttributes.meleeConfig.debuffEffect.tips");
-        return mobEffectSearchComponentConfigurator;
+        configurator.setFilter(effect -> effect != null && !effect.isBeneficial());
+        configurator.setTranslator(effect -> LocalizationUtils.format(effect.getDescriptionId()));
+        configurator.setTips("npcConfig.npcAttributes.meleeConfig.debuffEffect.tips");
+        return configurator;
+    }
+
+    private MobEffect getDebuffEffectValue() {
+        ResourceLocation key = ResourceLocation.tryParse(debuffEffect);
+        MobEffect effect = key == null ? null : BuiltInRegistries.MOB_EFFECT.get(key);
+        return effect == null ? BuiltInRegistries.MOB_EFFECT.get(DEFAULT_DEBUFF_EFFECT) : effect;
     }
 
     public static void executeAdditionalEffects(CustomNpc npc, LivingEntity hurtEntity) {

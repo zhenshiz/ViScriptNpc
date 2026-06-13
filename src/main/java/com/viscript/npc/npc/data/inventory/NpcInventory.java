@@ -7,10 +7,13 @@ import com.lowdragmc.lowdraglib2.configurator.annotation.Configurable;
 import com.lowdragmc.lowdraglib2.configurator.ui.ArrayConfiguratorGroup;
 import com.lowdragmc.lowdraglib2.configurator.ui.Configurator;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
+import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
+import com.lowdragmc.lowdraglib2.gui.texture.ItemStackTexture;
 import com.lowdragmc.lowdraglib2.math.Range;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.ReadOnlyManaged;
+import com.viscript.npc.gui.edit.page.NpcEditorPageIds;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.ConfiguratorUtil;
@@ -19,8 +22,11 @@ import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.minecraft.nbt.IntTag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import noppes.npcs.shared.client.gui.listeners.IGui;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -54,6 +60,11 @@ public class NpcInventory implements INpcData {
     @Persisted
     @ReadOnlyManaged(serializeMethod = "writeLootTables", deserializeMethod = "readLootTables")
     private List<LootTableConfig> lootTables = new ArrayList<>();
+
+    @Override
+    public ResourceLocation getEditorPage() {
+        return NpcEditorPageIds.INVENTORY;
+    }
 
     private void LootTableTypeSubConfiguratorBuilder(LootTableType value, ConfiguratorGroup group) {
         switch (value) {

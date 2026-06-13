@@ -24,7 +24,7 @@ import java.util.function.Supplier;
  */
 public class ConfiguratorUtil {
     public static SearchComponentConfigurator<Item> createItemSearchComponentConfigurator(String name, Supplier<String> getter, Consumer<String> setter, TagKey<Item> tag) {
-        SearchComponentConfigurator<Item> itemSearchComponentConfigurator = new SearchComponentConfigurator<>(name,
+        return new SearchComponentConfigurator<>(name,
                 () -> {
                     String id = getter.get();
                     return id != null ? BuiltInRegistries.ITEM.get(ResourceLocation.parse(id)) : Items.AIR;
@@ -57,7 +57,6 @@ public class ConfiguratorUtil {
                     return itemUIProvider.createUI(value);
                 }
         );
-        return itemSearchComponentConfigurator;
     }
 
     public static SearchComponentConfigurator<Item> createItemSearchComponentConfigurator(String name, Supplier<String> getter, Consumer<String> setter) {

@@ -1,7 +1,9 @@
 package com.viscript.npc.util;
 
 import com.lowdragmc.lowdraglib2.Platform;
+import com.lowdragmc.lowdraglib2.gui.factory.PlayerUIMenuType;
 import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
+import com.viscript.npc.gui.edit.NpcEditor;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.NpcRegister;
@@ -18,6 +20,7 @@ public class ViScriptNpcServerUtil {
 
     @Info("服务端打开NPC编辑器")
     public static void openNpcEditor(ServerPlayer player, CompoundTag tag) {
+        PlayerUIMenuType.openUI(player, NpcEditor.EDITOR_ID);
         RPCPacketDistributor.rpcToPlayer(player, S2CPayload.OPEN_NPC_EDITOR, tag);
     }
 
