@@ -57,6 +57,8 @@ public class NpcEditor extends ProjectFileEditor {
     private NPCPreviewView npcPreviewView;
     @Nullable
     private INpcEditorPage selectedNpcEditorPage;
+    private boolean npcAiWorldTestCollapsedRightWindow;
+    private boolean npcAiWorldTestRightWasCollapsed;
 
     public NpcEditor() {
         registerProjectFileType(NPCProject.PROVIDER);
@@ -194,6 +196,30 @@ public class NpcEditor extends ProjectFileEditor {
         setLeftWindowVisible(leftView != null);
         setRightWindowVisible(rightView != null);
         setBottomWindowVisible(bottomView != null);
+    }
+
+    public void applyNpcAiWorldTestLayout() {
+        ViewContainer rightContainer = rightWindow.getRightTop();
+        npcAiWorldTestRightWasCollapsed = rightContainer.isCollapse();
+        npcAiWorldTestCollapsedRightWindow = true;
+        setRightWindowVisible(true);
+        if (!rightContainer.isCollapse()) {
+            rightContainer.collapse();
+        }
+    }
+
+    public void restoreSelectedNpcEditorPageLayout() {
+        if (selectedNpcEditorPage != null && getCurrentProject() instanceof NPCProject npcProject) {
+            applyPageLayout(selectedNpcEditorPage, npcProject);
+        }
+        if (npcAiWorldTestCollapsedRightWindow) {
+            ViewContainer rightContainer = rightWindow.getRightTop();
+            if (!npcAiWorldTestRightWasCollapsed) {
+                rightContainer.expand();
+            }
+            npcAiWorldTestCollapsedRightWindow = false;
+            npcAiWorldTestRightWasCollapsed = false;
+        }
     }
 
     private void loadNpcEditorPages() {

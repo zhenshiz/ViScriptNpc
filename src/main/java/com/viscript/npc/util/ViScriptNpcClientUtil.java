@@ -123,6 +123,9 @@ public class ViScriptNpcClientUtil {
         EditorWindow editorWindow = getCurrentEditorWindow();
         if (editorWindow != null) {
             restoreEditorWindowForWorldTest(editorWindow);
+            if (editorWindow.getCurrentEditor() instanceof NpcEditor npcEditor) {
+                npcEditor.applyNpcAiWorldTestLayout();
+            }
         }
         setNpcAiWorldInteractionMode(true);
         if (targetChanged && wasActive && isNpcAiWorldInteractionMode()) {
@@ -145,6 +148,7 @@ public class ViScriptNpcClientUtil {
         if (!active) {
             KeyMapping.releaseAll();
             npcAiWorldBlockHit = null;
+            restoreEditorAfterWorldTest();
         }
     }
 
@@ -458,10 +462,11 @@ public class ViScriptNpcClientUtil {
         editorWindow.retoreWindow();
         int guiWidth = minecraft.getWindow().getGuiScaledWidth();
         int guiHeight = minecraft.getWindow().getGuiScaledHeight();
-        float width = Math.min(420f, Math.max(300f, guiWidth * 0.38f));
-        float height = Math.min(260f, Math.max(190f, guiHeight * 0.36f));
-        float left = -guiWidth / 2f + 8f;
-        float top = -guiHeight / 2f + 8f;
+        float width = Math.min(guiWidth, Math.max(360f, guiWidth * 0.40f));
+        float height = guiHeight;
+        float left = guiWidth / 2f - width;
+        float top = -guiHeight / 2f;
+        editorWindow.layout(layout -> layout.widthPercent(100).heightPercent(100));
         editorWindow.window.layout(layout -> layout
                 .positionType(TaffyPosition.ABSOLUTE)
                 .paddingAll(3)
@@ -469,6 +474,13 @@ public class ViScriptNpcClientUtil {
                 .top(top)
                 .width(width)
                 .height(height));
+    }
+
+    private static void restoreEditorAfterWorldTest() {
+        EditorWindow editorWindow = getCurrentEditorWindow();
+        if (editorWindow != null && editorWindow.getCurrentEditor() instanceof NpcEditor npcEditor) {
+            npcEditor.restoreSelectedNpcEditorPageLayout();
+        }
     }
 
     @Nullable
