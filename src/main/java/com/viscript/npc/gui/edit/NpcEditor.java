@@ -50,6 +50,7 @@ public class NpcEditor extends ProjectFileEditor {
     private final Map<String, View> npcEditorPageCenterViews = new LinkedHashMap<>();
     private final Map<String, View> npcEditorPageLeftViews = new LinkedHashMap<>();
     private final Map<String, View> npcEditorPageRightViews = new LinkedHashMap<>();
+    private final Map<String, View> npcEditorPageBottomViews = new LinkedHashMap<>();
     private final Map<String, Object> npcEditorPageStates = new LinkedHashMap<>();
     private final NpcInspectorView npcInspectorView = new NpcInspectorView(this);
     @Nullable
@@ -176,20 +177,23 @@ public class NpcEditor extends ProjectFileEditor {
     }
 
     public <T> T getPageState(INpcEditorPage page, Class<T> type, java.util.function.Supplier<T> factory) {
-        return type.cast(npcEditorPageStates.computeIfAbsent(pageKey(page), key -> factory.get()));
+        return type.cast(npcEditorPageStates.computeIfAbsent(pageStateKey(page, type), key -> factory.get()));
     }
 
     public void applyPageLayout(INpcEditorPage page, NPCProject project) {
         var leftView = npcEditorPageLeftViews.computeIfAbsent(pageKey(page), key -> page.createLeftView(this, project));
         var centerView = npcEditorPageCenterViews.computeIfAbsent(pageKey(page), key -> page.createCenterView(this, project));
         var rightView = npcEditorPageRightViews.computeIfAbsent(pageKey(page), key -> page.createRightView(this, project));
+        var bottomView = npcEditorPageBottomViews.computeIfAbsent(pageKey(page), key -> page.createBottomView(this, project));
 
         applySlotView(leftWindow.getLeftTop(), leftView, project, page);
         applySlotView(centerWindow.getLeftTop(), centerView, project, page);
         applySlotView(rightWindow.getRightTop(), rightView, project, page);
+        applySlotView(bottomWindow.getLeftBottom(), bottomView, project, page);
 
         setLeftWindowVisible(leftView != null);
         setRightWindowVisible(rightView != null);
+        setBottomWindowVisible(bottomView != null);
     }
 
     private void loadNpcEditorPages() {
@@ -216,14 +220,17 @@ public class NpcEditor extends ProjectFileEditor {
         clearSlotViews(npcEditorPageLeftViews);
         clearSlotViews(npcEditorPageCenterViews);
         clearSlotViews(npcEditorPageRightViews);
+        clearSlotViews(npcEditorPageBottomViews);
         clearNpcPreviewView();
         setLeftWindowVisible(false);
         setRightWindowVisible(true);
+        setBottomWindowVisible(true);
         npcEditorPages.clear();
         npcEditorPageTabs.clear();
         npcEditorPageLeftViews.clear();
         npcEditorPageCenterViews.clear();
         npcEditorPageRightViews.clear();
+        npcEditorPageBottomViews.clear();
         npcEditorPageStates.clear();
         npcEditorPageBar.clearAllChildren();
         npcEditorPageBar.setDisplay(false);
@@ -269,6 +276,10 @@ public class NpcEditor extends ProjectFileEditor {
 
     private void setRightWindowVisible(boolean visible) {
         setWindowVisible(rightWindow, visible);
+    }
+
+    private void setBottomWindowVisible(boolean visible) {
+        setWindowVisible(bottomWindow, visible);
     }
 
     private void setWindowVisible(com.lowdragmc.lowdraglib2.editor.ui.SplittableWindow window, boolean visible) {
@@ -354,6 +365,10 @@ public class NpcEditor extends ProjectFileEditor {
 
     private String pageKey(INpcEditorPage page) {
         return page.pageId().toString();
+    }
+
+    private String pageStateKey(INpcEditorPage page, Class<?> type) {
+        return pageKey(page) + "#" + type.getName();
     }
 
     private void detachDefaultInspectorView() {

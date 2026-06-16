@@ -47,7 +47,7 @@ public class NpcCommand implements ICommand {
                 .then(Commands.literal("editor").executes(this::openEditor)
                         .then(Commands.argument("file", StringArgumentType.greedyString())
                                 .suggests(((context, builder) -> {
-                                    getServerNpcFiles().forEach(builder::suggest);
+                                    getServerEditorFiles().forEach(builder::suggest);
                                     return builder.buildFuture();
                                 })).executes(this::openEditor)
                         )
@@ -61,16 +61,38 @@ public class NpcCommand implements ICommand {
         return EditorAssetFiles.listRuntimeFiles(FORMAT, true);
     }
 
+    static List<String> getServerEditorFiles() {
+        return EditorAssetFiles.listProjectFiles(FORMAT, true);
+    }
+
+    static File getNpcProjectFile(String fileName) {
+        return EditorAssetFiles.resolveProjectFile(FORMAT, normalizeFileArgument(fileName), true).toFile();
+    }
+
     static File getNpcFile(String fileName) {
+        return EditorAssetFiles.resolveRuntimeFile(FORMAT, normalizeFileArgument(fileName), true).toFile();
+    }
+
+    private static String normalizeFileArgument(String fileName) {
         if (fileName.startsWith("\"")) fileName = fileName.substring(1);
         if (fileName.endsWith("\"")) fileName = fileName.substring(0, fileName.length() - 1);
-        return EditorAssetFiles.resolveRuntimeFile(FORMAT, fileName, true).toFile();
+        return fileName;
     }
 
     static CompoundTag readNpcFile(File file) {
         if (!file.exists()) return new CompoundTag();
         try (var inputStream = Files.newInputStream(file.toPath())) {
             return NbtIo.readCompressed(inputStream, NbtAccounter.unlimitedHeap());
+        } catch (IOException e) {
+            return new CompoundTag();
+        }
+    }
+
+    static CompoundTag readProjectFile(File file) {
+        if (!file.exists()) return new CompoundTag();
+        try {
+            CompoundTag tag = NbtIo.read(file.toPath());
+            return tag == null ? new CompoundTag() : tag;
         } catch (IOException e) {
             return new CompoundTag();
         }
@@ -108,11 +130,14 @@ public class NpcCommand implements ICommand {
             } catch (Exception ignored) {
             }
             if (!fileName.isEmpty()) {
-                var tag = readNpcFile(getNpcFile(fileName));
-                if (!tag.isEmpty()) {
-                    ViScriptNpcServerUtil.openNpcEditor(player, tag);
+                var projectFile = getNpcProjectFile(fileName);
+                var projectTag = readProjectFile(projectFile);
+                if (!projectTag.isEmpty()) {
+                    ViScriptNpcServerUtil.openNpcEditor(player, projectTag);
                     return 1;
                 }
+                source.sendFailure(Component.translatable("command.viscript_npc.editor.project_file_required", fileName));
+                return 0;
             }
             ViScriptNpcServerUtil.openNpcEditor(player, new CompoundTag());
             return 1;

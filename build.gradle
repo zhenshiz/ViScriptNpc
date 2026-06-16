@@ -10,6 +10,8 @@ plugins {
 version = mod_version
 group = mod_group_id
 
+def customNpcsJar = files("libs/CustomNPCs-Unofficial-NeoForge-1.21.1.20241226.jar")
+
 repositories {
     //kubejs
     maven {
@@ -122,8 +124,11 @@ neoForge {
         configureEach {
             systemProperty 'forge.logging.markers', 'REGISTRIES'
 
-            jvmArguments.add '-XX:+AllowEnhancedClassRedefinition'
-            jvmArguments.add '-XX:HotswapAgent=fatjar'
+            if (name != "gameTestServer") {
+                jvmArguments.add '-XX:+AllowEnhancedClassRedefinition'
+                jvmArguments.add '-XX:HotswapAgent=fatjar'
+                getAdditionalRuntimeClasspathConfiguration().dependencies.add(project.dependencies.create(customNpcsJar))
+            }
 
             logLevel = org.slf4j.event.Level.DEBUG
         }
@@ -143,14 +148,20 @@ modAccessor {
     accessTransformerFiles = project.files('src/main/resources/META-INF/accesstransformer.cfg')
 }
 
+configurations.configureEach {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+}
 
 dependencies {
     // LDLib2
     implementation("com.lowdragmc.ldlib2:ldlib2-neoforge-${minecraft_version}:${ldlib2_version}:all")
     implementation("com.zhenshiz:ViScriptLib-neoforge-${minecraft_version}:${viscriptlib_version}") {
-        transitive = false
+        changing = true
     }
-    jarJar("com.zhenshiz:ViScriptLib-neoforge-${minecraft_version}:${viscriptlib_version}")
+    jarJar("com.zhenshiz:ViScriptLib-neoforge-${minecraft_version}:${viscriptlib_version}") {
+        changing = true
+    }
+
     implementation "org.thexeler:attention-mind:${attention_mind_version}"
     jarJar "org.thexeler:attention-mind:${attention_mind_version}"
 
@@ -172,7 +183,7 @@ dependencies {
     //chatbox
     compileOnly "maven.modrinth:chatbox:${chatbox_version}"
 
-    implementation files("libs/CustomNPCs-Unofficial-NeoForge-1.21.1.20241226.jar")
+    compileOnly customNpcsJar
 
     implementation "software.bernie.geckolib:geckolib-neoforge-1.21.1:4.8.2"
 

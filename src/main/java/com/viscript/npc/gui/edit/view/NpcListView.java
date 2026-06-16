@@ -128,6 +128,10 @@ public class NpcListView extends View implements INpcEditorSlotView {
         }
     }
 
+    public int getSelectedEntityId() {
+        return selectedEntityId;
+    }
+
     private UIElement createInfoLabel(String key) {
         return new Label()
                 .setText(Component.translatable(key))
@@ -154,7 +158,7 @@ public class NpcListView extends View implements INpcEditorSlotView {
 
     private void createNewNpc() {
         if (editor.getCurrentProject() instanceof NPCProject npcProject) {
-            CompoundTag tag = npcProject.npc.npcConfig.serializeNBT(Platform.getFrozenRegistry());
+            CompoundTag tag = npcProject.serializeNpcConfig(Platform.getFrozenRegistry());
             tag.putString("npcType", npcProject.getCurrentNpcType());
             RPCPacketDistributor.rpcToServer(C2SPayload.CREATE_NEW_NPC, tag);
         }
@@ -193,7 +197,7 @@ public class NpcListView extends View implements INpcEditorSlotView {
             return;
         }
         if (editor.getCurrentProject() instanceof NPCProject npcProject) {
-            CompoundTag tag = npcProject.npc.npcConfig.serializeNBT(Platform.getFrozenRegistry());
+            CompoundTag tag = npcProject.serializeNpcConfig(Platform.getFrozenRegistry());
             tag.putString("npcType", npcProject.getCurrentNpcType());
             RPCPacketDistributor.rpcToServer(C2SPayload.OVERWRITE_NPC, selectedEntityId, tag);
         }

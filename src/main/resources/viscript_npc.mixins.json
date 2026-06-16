@@ -11,6 +11,10 @@
     "GeoRendererMixin",
     "LivingEntityRenderMixin",
     "LivingEntityRendererAccessor",
+    "MinecraftInteractionAccessor",
+    "MouseHandlerAccessor",
+    "NpcAiWorldCameraMixin",
+    "NpcEditorContainerScreenMixin",
     "WorldSceneRendererAccessor"
   ],
   "injectors": {

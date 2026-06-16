@@ -9,6 +9,9 @@ import com.viscript.npc.compat.curios.NpcCuriosCompat;
 import com.viscript.npc.event.neoforge.NpcEvent;
 import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.data.INpcData;
+import com.viscript.npc.npc.data.ai.NpcAI;
+import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorDebugSnapshot;
+import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorRuntime;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
 import com.viscript.npc.npc.data.attributes.ResistanceConfig;
@@ -36,7 +39,6 @@ import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.goal.*;
 import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.ai.navigation.WaterBoundPathNavigation;
 import net.minecraft.world.entity.monster.CrossbowAttackMob;
@@ -66,6 +68,7 @@ import org.joml.Quaternionf;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -74,6 +77,7 @@ import java.util.stream.Collectors;
 public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     protected final WaterBoundPathNavigation waterNavigation;
     protected final GroundPathNavigation groundNavigation;
+    private final NpcBehaviorRuntime behaviorRuntime = new NpcBehaviorRuntime(this);
     public static Set<String> lootTableKeys = Set.of();
 
     //披风用参数
@@ -88,13 +92,8 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     @Nullable
     private Quaternionf previewCameraOrientation;
 
-//    // MindMachine
-//    @Getter
-//    MindMachine mind;
-
     public CustomNpc(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
-//        mind = new MindMachine(this);
         this.waterNavigation = new WaterBoundPathNavigation(this, level);
         this.groundNavigation = new GroundPathNavigation(this, level);
     }
@@ -142,10 +141,13 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     }
 
     @Override
-    public void setChargingCrossbow(boolean b) {}
+    public void setChargingCrossbow(boolean b) {
+    }
 
     @Override
-    public void onCrossbowAttackPerformed() {this.noActionTime = 0;}
+    public void onCrossbowAttackPerformed() {
+        this.noActionTime = 0;
+    }
 
     private ItemStack getHoldingWeapon() {
         Predicate<ItemStack> p = stack -> {
@@ -214,7 +216,9 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         NeoForge.EVENT_BUS.post(new NpcEvent.Tick(this));
         // MindMachine
 //        mind.tick();
-        if (level().isClientSide()) {
+        if (!level().isClientSide()) {
+            behaviorRuntime.tick();
+        } else {
             this.moveCloak();
             Entity entity = getNpcDynamicModel().getEntity(this);
             try { // 某些生物的AI会导致奇怪的崩溃
@@ -325,8 +329,7 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         super.readAdditionalSaveData(compoundTag);
         NpcAttachmentType.getAttachmentClasses().forEach(clazz -> {
             INpcData npcAttachment = this.getNpcAttachment(clazz);
-            npcAttachment.deserializeNBT(Platform.getFrozenRegistry(),
-                    compoundTag.getCompound(NpcAttachmentType.getAttachmentName(clazz)));
+            npcAttachment.deserializeNBT(Platform.getFrozenRegistry(), compoundTag);
         });
         updateNpcState();
     }
@@ -357,7 +360,7 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS, npcAttributes.getDefenseConfig().getArmorToughness());
 
         //AI
-
+        behaviorRuntime.configure(getNpcAI());
 
         //联动模组
         if (ViScriptNpc.isCuriosLoaded()) {
@@ -437,6 +440,72 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
 
     public NpcInventory getNpcInventory() {
         return getNpcAttachment(NpcInventory.class);
+    }
+
+    public NpcAI getNpcAI() {
+        return getNpcAttachment(NpcAI.class);
+    }
+
+    public NpcBehaviorDebugSnapshot getNpcBehaviorDebugSnapshot() {
+        return behaviorRuntime.getLastDebugSnapshot();
+    }
+
+    public void setNpcBehaviorDebugPaused(boolean paused) {
+        behaviorRuntime.setDebugPaused(paused);
+    }
+
+    public boolean isNpcBehaviorDebugPaused() {
+        return behaviorRuntime.isDebugPaused();
+    }
+
+    public void stepNpcBehaviorDebug() {
+        behaviorRuntime.stepDebugTickNow();
+    }
+
+    public void continueNpcBehaviorDebug() {
+        behaviorRuntime.continueDebug();
+    }
+
+    public void stopNpcBehaviorDebug() {
+        behaviorRuntime.stopDebug();
+    }
+
+    public void setNpcBehaviorEditorDebugTarget(@Nullable LivingEntity target) {
+        behaviorRuntime.setEditorDebugTarget(target);
+    }
+
+    public void setNpcBehaviorEditorDebugIgnoredPlayer(@Nullable UUID playerUuid) {
+        behaviorRuntime.setEditorDebugIgnoredPlayer(playerUuid);
+    }
+
+    public void clearNpcBehaviorEditorDebugIgnoredPlayer(UUID playerUuid) {
+        behaviorRuntime.clearEditorDebugIgnoredPlayer(playerUuid);
+    }
+
+    public void tickNpcBehaviorForEditorDebug() {
+        behaviorRuntime.tickForEditorDebug();
+        tickEditorDebugAiControls();
+    }
+
+    public void stepNpcBehaviorDebugForEditor() {
+        behaviorRuntime.stepDebugTickNowForEditor();
+        tickEditorDebugAiControls();
+    }
+
+    public void continueNpcBehaviorDebugForEditor() {
+        behaviorRuntime.continueDebug();
+    }
+
+    public void stopNpcBehaviorDebugForEditor() {
+        behaviorRuntime.stopDebug();
+        tickEditorDebugAiControls();
+    }
+
+    private void tickEditorDebugAiControls() {
+        navigation.tick();
+        moveControl.tick();
+        lookControl.tick();
+        jumpControl.tick();
     }
 
     public String getNpcType() {

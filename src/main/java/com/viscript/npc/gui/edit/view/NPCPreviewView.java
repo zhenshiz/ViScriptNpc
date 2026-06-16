@@ -194,7 +194,7 @@ public class NPCPreviewView extends View implements INpcEditorSlotView {
             super.renderAfterWorld(bufferSource, partialTicks);
             if (customNpc != null && editor.getCurrentProject() instanceof NPCProject npcProject) {
                 NpcConfig npcConfig = npcProject.npc.npcConfig;
-                CompoundTag configTag = npcConfig.serializeNBT(Platform.getFrozenRegistry());
+                CompoundTag configTag = npcProject.serializeNpcConfig(Platform.getFrozenRegistry());
                 customNpc.readAdditionalSaveData(configTag);
 
                 AABB aabb = npcConfig.getNpcData(NpcDynamicModel.class).getAabb();

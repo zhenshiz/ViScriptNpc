@@ -11,6 +11,7 @@ import java.util.Set;
 public class S2CPayload {
     public static final String OPEN_NPC_EDITOR = "openNpcEditor";
     public static final String SEND_LOOT_TABLES = "sendLootTables";
+    public static final String SEND_NPC_AI_DEBUG_SNAPSHOT = "sendNpcAiDebugSnapshot";
 
     @RPCPacket(OPEN_NPC_EDITOR)
     public static void openNpcEditor(RPCSender sender, CompoundTag tag) {
@@ -20,5 +21,12 @@ public class S2CPayload {
     @RPCPacket(SEND_LOOT_TABLES)
     public static void setSendLootTables(RPCSender sender, Set<String> keys) {
         if (sender.isServer()) CustomNpc.lootTableKeys = keys;
+    }
+
+    @RPCPacket(SEND_NPC_AI_DEBUG_SNAPSHOT)
+    public static void sendNpcAiDebugSnapshot(RPCSender sender, CompoundTag payload) {
+        if (sender.isServer()) {
+            ViScriptNpcClientUtil.setNpcAiDebugSnapshot(payload);
+        }
     }
 }

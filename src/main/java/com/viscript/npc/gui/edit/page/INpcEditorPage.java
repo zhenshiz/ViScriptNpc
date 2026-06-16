@@ -51,6 +51,10 @@ public interface INpcEditorPage extends ILDLRegisterClient<INpcEditorPage, Suppl
         return createInspectorView(editor, project);
     }
 
+    default View createBottomView(NpcEditor editor, NPCProject project) {
+        return editor.getResourceView();
+    }
+
     default InspectorView createInspectorView(NpcEditor editor, NPCProject project) {
         return editor.getInspectorView();
     }
