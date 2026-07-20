@@ -71,7 +71,6 @@ public class NpcEditor extends ProjectFileEditor {
     private boolean npcAiWorldTestRightWasCollapsed;
 
     public NpcEditor() {
-        registerProjectFileType(NPCProject.PROVIDER);
         this.icon.style(style -> style.backgroundTexture(ICON));
         detachDefaultInspectorView();
         initNpcEditorPageBar();

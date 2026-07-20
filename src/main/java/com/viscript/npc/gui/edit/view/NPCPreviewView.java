@@ -5,6 +5,7 @@ import com.lowdragmc.lowdraglib2.client.scene.ISceneEntityRenderHook;
 import com.lowdragmc.lowdraglib2.client.utils.RenderBufferUtils;
 import com.lowdragmc.lowdraglib2.editor.ui.View;
 import com.lowdragmc.lowdraglib2.editor.ui.sceneeditor.SceneEditor;
+import com.lowdragmc.lowdraglib2.editor.ui.sceneeditor.sceneobject.utils.TransformGizmo.Mode;
 import com.lowdragmc.lowdraglib2.gui.ColorPattern;
 import com.lowdragmc.lowdraglib2.gui.texture.GuiTextureGroup;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
@@ -248,22 +249,22 @@ public class NPCPreviewView extends View implements INpcEditorSlotView {
         public void initGizmos() {
             var toggleGroup = new Toggle.ToggleGroup();
             // translate
-            gizmoBar.addChild(createTransformToggle(toggleGroup, TransformGizmoMode.TRANSLATE, Icons.TRANSFORM_TRANSLATE));
+            gizmoBar.addChild(createTransformToggle(toggleGroup, Mode.TRANSLATE, Icons.TRANSFORM_TRANSLATE));
             // scale
-            gizmoBar.addChild(createTransformToggle(toggleGroup, TransformGizmoMode.SCALE, Icons.TRANSFORM_SCALE));
+            gizmoBar.addChild(createTransformToggle(toggleGroup, Mode.SCALE, Icons.TRANSFORM_SCALE));
         }
 
-        private Toggle createTransformToggle(Toggle.ToggleGroup toggleGroup, TransformGizmoMode mode, IGuiTexture icon) {
+        private Toggle createTransformToggle(Toggle.ToggleGroup toggleGroup, Mode mode, IGuiTexture icon) {
             return (Toggle) new Toggle()
                     .setToggleGroup(toggleGroup)
                     .setText("")
-                    .setOn(transformGizmoMode == mode, false)
+                    .setOn(getTransformGizmoMode() == mode, false)
                     .toggleButton(button -> button.layout(layout -> {
                         layout.widthPercent(100);
                         layout.heightPercent(100);
                     }))
                     .setOnToggleChanged(isOn -> {
-                        setTransformGizmoMode(isOn ? mode : TransformGizmoMode.NONE);
+                        setTransformGizmoMode(isOn ? mode : Mode.NONE);
                     })
                     .toggleStyle(style -> {
                         style.baseTexture(IGuiTexture.EMPTY);
@@ -277,8 +278,8 @@ public class NPCPreviewView extends View implements INpcEditorSlotView {
                         layout.setAspectRatio(1f);
                     }).addEventListener(UIEvents.TICK, event -> {
                         if (event.currentElement instanceof Toggle toggle) {
-                            if (toggle.getValue() != (transformGizmoMode == mode)) {
-                                toggle.setValue(transformGizmoMode == mode, false);
+                            if (toggle.getValue() != (getTransformGizmoMode() == mode)) {
+                                toggle.setValue(getTransformGizmoMode() == mode, false);
                             }
                         }
                     });

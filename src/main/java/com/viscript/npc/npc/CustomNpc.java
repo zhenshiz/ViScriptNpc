@@ -12,6 +12,9 @@ import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.npc.data.ai.IntentionEntry;
 import com.viscript.npc.npc.data.ai.NpcAI;
+import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorTreeIntention;
+import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorDebugSnapshot;
+import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorRuntime;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
 import com.viscript.npc.npc.data.attributes.RangedConfig;
@@ -69,6 +72,7 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.thexeler.MindMachine;
+import org.thexeler.api.IntentionPriority;
 import org.thexeler.api.IntentionTypeRegistry;
 import org.thexeler.api.MindMachineManager;
 import org.thexeler.intention.BaseIntention;
@@ -76,6 +80,7 @@ import org.thexeler.intention.BaseIntention;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @ParametersAreNonnullByDefault
@@ -85,6 +90,8 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     protected final GroundPathNavigation groundNavigation;
     @Nullable
     private MindMachine mind;
+    @Nullable
+    private NpcBehaviorTreeIntention behaviorTreeIntention;
     private int mindConfigHash;
     public static Set<String> lootTableKeys = Set.of();
     public static Set<String> factionIds = Set.of();
@@ -340,8 +347,9 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
             npcAttachment.deserializeNBT(Platform.getFrozenRegistry(), compoundTag);
         });
         if (!level().isClientSide && compoundTag.contains("mind")) {
-            mind = MindMachine.deserialize(this, compoundTag.getCompound("mind"));
-            mindConfigHash = currentMindConfigHash(getNpcAI());
+            mind = null;
+            behaviorTreeIntention = null;
+            mindConfigHash = 0;
         }
         updateNpcState();
     }
@@ -379,7 +387,7 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
 
         //AI
         NpcAI npcAI = getNpcAI();
-        this.setNoAi(npcAI.isEnabled());
+        this.setNoAi(!npcAI.isEnabled());
         syncMindState(npcAI);
 
         //联动模组
@@ -479,6 +487,10 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         if (this.level().isClientSide || mind != null) return;
         mind = MindMachineManager.getInstance().createInstance(this, ai.toConfig());
         mindConfigHash = configHash;
+        if (ai.getBehaviorGraph() != null && !ai.getBehaviorGraph().isEmpty()) {
+            behaviorTreeIntention = new NpcBehaviorTreeIntention(mind, ai);
+            mind.addIntention(IntentionPriority.URGENT, behaviorTreeIntention);
+        }
         for (IntentionEntry entry : ai.getIntentions()) {
             try {
                 BaseIntention intention = IntentionTypeRegistry.deserialize(entry.getType(), mind, entry.getData());
@@ -510,11 +522,70 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
             MindMachineManager.getInstance().removeInstance(this);
             mind = null;
         }
+        behaviorTreeIntention = null;
         mindConfigHash = 0;
     }
 
+    public boolean isNpcBehaviorDebugPaused() {
+        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
+        return runtime != null && runtime.isDebugPaused();
+    }
+
+    public void setNpcBehaviorDebugPaused(boolean paused) {
+        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
+        if (runtime != null) {
+            runtime.setDebugPaused(paused);
+        }
+    }
+
+    public void continueNpcBehaviorDebug() {
+        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
+        if (runtime != null) {
+            runtime.continueDebug();
+        }
+    }
+
+    public void stepNpcBehaviorDebug() {
+        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
+        if (runtime != null) {
+            runtime.stepDebugTickNow();
+        }
+    }
+
+    public void stopNpcBehaviorDebug() {
+        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
+        if (runtime != null) {
+            runtime.stopDebug();
+        }
+    }
+
+    public void setNpcBehaviorEditorDebugIgnoredPlayer(UUID playerUuid) {
+        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
+        if (runtime != null) {
+            runtime.setEditorDebugIgnoredPlayer(playerUuid);
+        }
+    }
+
+    public void clearNpcBehaviorEditorDebugIgnoredPlayer(UUID playerUuid) {
+        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
+        if (runtime != null) {
+            runtime.clearEditorDebugIgnoredPlayer(playerUuid);
+        }
+    }
+
+    public NpcBehaviorDebugSnapshot getNpcBehaviorDebugSnapshot() {
+        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
+        return runtime == null ? new NpcBehaviorDebugSnapshot() : runtime.getLastDebugSnapshot();
+    }
+
+    @Nullable
+    private NpcBehaviorRuntime getNpcBehaviorRuntime() {
+        return behaviorTreeIntention == null ? null : behaviorTreeIntention.runtime();
+    }
+
     private int currentMindConfigHash(NpcAI ai) {
-        return Objects.hash(ai.isEnabled(), ai.getTickRate(), ai.getNavigation(), ai.getIntentions());
+        return Objects.hash(ai.isEnabled(), ai.getTickRate(), ai.getNavigation(), ai.getIntentions(),
+                ai.getBehaviorGraph(), ai.getBehaviorProgram());
     }
 
     public String getNpcType() {

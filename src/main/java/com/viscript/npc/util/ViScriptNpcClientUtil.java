@@ -43,7 +43,9 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ViScriptNpcClientUtil {
     private static final double NPC_AI_WORLD_TEST_TARGET_RADIUS = 64.0D;
@@ -72,6 +74,7 @@ public class ViScriptNpcClientUtil {
     private static long npcAiWorldPathExpireTick;
     private static List<Vec3> npcAiWorldPathPoints = List.of();
     private static boolean npcAiWorldPathVisible = true;
+    private static final Map<Integer, CompoundTag> NPC_AI_DEBUG_SNAPSHOTS = new HashMap<>();
 
     @Info("客户端打开NPC编辑器")
     public static void openNpcEditor(@Nullable CompoundTag tag) {
@@ -119,12 +122,32 @@ public class ViScriptNpcClientUtil {
         return npc == null ? -1 : npc.getId();
     }
 
+    public static int findNearestNpcAiDebugTarget(@Nullable String npcType) {
+        return findNearestNpcAiWorldTestTarget(npcType);
+    }
+
     public static String getClientNpcWorldTestName(int entityId) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || !(minecraft.level.getEntity(entityId) instanceof CustomNpc npc)) {
             return "";
         }
         return npc.getNpcType() + " #" + entityId;
+    }
+
+    public static String getClientNpcDebugName(int entityId) {
+        return getClientNpcWorldTestName(entityId);
+    }
+
+    public static void setNpcAiDebugSnapshot(CompoundTag payload) {
+        if (payload == null || !payload.contains("entityId")) {
+            return;
+        }
+        NPC_AI_DEBUG_SNAPSHOTS.put(payload.getInt("entityId"), payload.copy());
+    }
+
+    public static CompoundTag getNpcAiDebugSnapshot(int entityId) {
+        CompoundTag payload = NPC_AI_DEBUG_SNAPSHOTS.get(entityId);
+        return payload == null ? new CompoundTag() : payload.copy();
     }
 
     public static void enterNpcAiWorldTestMode(int targetEntityId) {

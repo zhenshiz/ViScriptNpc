@@ -3,10 +3,13 @@ package com.viscript.npc.network.c2s;
 import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacket;
 import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
 import com.lowdragmc.lowdraglib2.syncdata.rpc.RPCSender;
+import com.lowdragmc.lowdraglib2.Platform;
 import com.viscript.npc.compat.team.NpcFactionBridge;
 import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.NpcRegister;
+import com.viscript.npc.npc.data.ai.NpcAI;
+import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorDataSerializers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -31,6 +34,13 @@ public class C2SPayload {
     public static final String USE_NPC_AI_WORLD_TEST_BLOCK = "useNpcAiWorldTestBlock";
     public static final String MOVE_NPC_AI_WORLD_TEST_MOB = "moveNpcAiWorldTestMob";
     public static final String REQUEST_NPC_AI_WORLD_TEST_PATH = "requestNpcAiWorldTestPath";
+    public static final String SET_NPC_AI_DEBUG_PAUSED = "setNpcAiDebugPaused";
+    public static final String CONTINUE_NPC_AI_DEBUG = "continueNpcAiDebug";
+    public static final String STEP_NPC_AI_DEBUG = "stepNpcAiDebug";
+    public static final String STOP_NPC_AI_DEBUG = "stopNpcAiDebug";
+    public static final String REQUEST_NPC_AI_DEBUG_SNAPSHOT = "requestNpcAiDebugSnapshot";
+    public static final String SYNC_NPC_AI_DEBUG_CONFIG = "syncNpcAiDebugConfig";
+    public static final String SET_NPC_AI_DEBUG_IGNORED_PLAYER = "setNpcAiDebugIgnoredPlayer";
     public static final String REQUEST_FACTION_IDS = "requestFactionIds";
 
     @RPCPacket(CREATE_NEW_NPC)
@@ -128,6 +138,93 @@ public class C2SPayload {
         }
     }
 
+    @RPCPacket(SET_NPC_AI_DEBUG_PAUSED)
+    public static void setNpcAiDebugPaused(RPCSender sender, int entityId, boolean paused) {
+        if (!sender.isServer()) {
+            ServerPlayer player = sender.asPlayer();
+            CustomNpc npc = getWorldTestNpc(player, entityId);
+            if (npc == null) return;
+            if (paused) {
+                npc.setNpcBehaviorDebugPaused(true);
+            } else {
+                npc.continueNpcBehaviorDebug();
+            }
+            sendNpcAiDebugSnapshot(player, entityId, npc);
+        }
+    }
+
+    @RPCPacket(CONTINUE_NPC_AI_DEBUG)
+    public static void continueNpcAiDebug(RPCSender sender, int entityId) {
+        if (!sender.isServer()) {
+            ServerPlayer player = sender.asPlayer();
+            CustomNpc npc = getWorldTestNpc(player, entityId);
+            if (npc == null) return;
+            npc.continueNpcBehaviorDebug();
+            sendNpcAiDebugSnapshot(player, entityId, npc);
+        }
+    }
+
+    @RPCPacket(STEP_NPC_AI_DEBUG)
+    public static void stepNpcAiDebug(RPCSender sender, int entityId) {
+        if (!sender.isServer()) {
+            ServerPlayer player = sender.asPlayer();
+            CustomNpc npc = getWorldTestNpc(player, entityId);
+            if (npc == null) return;
+            npc.stepNpcBehaviorDebug();
+            sendNpcAiDebugSnapshot(player, entityId, npc);
+        }
+    }
+
+    @RPCPacket(STOP_NPC_AI_DEBUG)
+    public static void stopNpcAiDebug(RPCSender sender, int entityId) {
+        if (!sender.isServer()) {
+            ServerPlayer player = sender.asPlayer();
+            CustomNpc npc = getWorldTestNpc(player, entityId);
+            if (npc == null) return;
+            npc.stopNpcBehaviorDebug();
+            sendNpcAiDebugSnapshot(player, entityId, npc);
+        }
+    }
+
+    @RPCPacket(REQUEST_NPC_AI_DEBUG_SNAPSHOT)
+    public static void requestNpcAiDebugSnapshot(RPCSender sender, int entityId) {
+        if (!sender.isServer()) {
+            ServerPlayer player = sender.asPlayer();
+            CustomNpc npc = getWorldTestNpc(player, entityId);
+            if (npc == null) return;
+            sendNpcAiDebugSnapshot(player, entityId, npc);
+        }
+    }
+
+    @RPCPacket(SYNC_NPC_AI_DEBUG_CONFIG)
+    public static void syncNpcAiDebugConfig(RPCSender sender, int entityId, CompoundTag aiTag) {
+        if (!sender.isServer()) {
+            ServerPlayer player = sender.asPlayer();
+            CustomNpc npc = getWorldTestNpc(player, entityId);
+            if (npc == null || aiTag == null || aiTag.isEmpty()) return;
+            NpcAI ai = npc.getNpcAI();
+            ai.deserializeNBT(Platform.getFrozenRegistry(), aiTag);
+            ai.setBehaviorProgram(ai.getCompiledBehaviorProgram());
+            npc.updateNpcState();
+            sendNpcAiDebugSnapshot(player, entityId, npc);
+        }
+    }
+
+    @RPCPacket(SET_NPC_AI_DEBUG_IGNORED_PLAYER)
+    public static void setNpcAiDebugIgnoredPlayer(RPCSender sender, int entityId, boolean ignored) {
+        if (!sender.isServer()) {
+            ServerPlayer player = sender.asPlayer();
+            CustomNpc npc = getWorldTestNpc(player, entityId);
+            if (player == null || npc == null) return;
+            if (ignored) {
+                npc.setNpcBehaviorEditorDebugIgnoredPlayer(player.getUUID());
+            } else {
+                npc.clearNpcBehaviorEditorDebugIgnoredPlayer(player.getUUID());
+            }
+            sendNpcAiDebugSnapshot(player, entityId, npc);
+        }
+    }
+
     @RPCPacket(REQUEST_FACTION_IDS)
     public static void requestFactionIds(RPCSender sender) {
         if (!sender.isServer()) {
@@ -172,5 +269,16 @@ public class C2SPayload {
         if (player == null || entityId < 0) return null;
         Entity entity = ((ServerLevel) player.level()).getEntity(entityId);
         return entity instanceof CustomNpc npc ? npc : null;
+    }
+
+    private static void sendNpcAiDebugSnapshot(ServerPlayer player, int entityId, CustomNpc npc) {
+        if (player == null || npc == null) return;
+        NpcBehaviorDataSerializers.register();
+        CompoundTag payload = new CompoundTag();
+        payload.putInt("entityId", entityId);
+        payload.putBoolean("paused", npc.isNpcBehaviorDebugPaused());
+        payload.putString("npcType", npc.getNpcType());
+        payload.put("snapshot", npc.getNpcBehaviorDebugSnapshot().serializeNBT(Platform.getFrozenRegistry()));
+        RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_NPC_AI_DEBUG_SNAPSHOT, payload);
     }
 }
