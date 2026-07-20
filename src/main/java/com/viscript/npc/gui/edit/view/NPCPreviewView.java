@@ -108,7 +108,7 @@ public class NPCPreviewView extends View implements INpcEditorSlotView {
         level.addEntity(customNpc);
         sceneEditor.scene.setRenderedCore(level.getFilledBlocks().longStream().mapToObj(BlockPos::of).toList());
         if (editor.getCurrentProject() instanceof NPCProject npcProject) {
-            ClientNpcConfig npcConfig = new ClientNpcConfig(npcProject.npc.npcConfig);
+            ClientNpcConfig npcConfig = new ClientNpcConfig(npcProject.npc);
             AABB aabb = npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
             npcConfig.transform.scale(collisionBoxGizmoScale(aabb));
 
@@ -194,7 +194,7 @@ public class NPCPreviewView extends View implements INpcEditorSlotView {
         protected void renderAfterWorld(@NotNull MultiBufferSource bufferSource, float partialTicks) {
             super.renderAfterWorld(bufferSource, partialTicks);
             if (customNpc != null && editor.getCurrentProject() instanceof NPCProject npcProject) {
-                NpcConfig npcConfig = npcProject.npc.npcConfig;
+                NpcConfig npcConfig = npcProject.npc;
                 CompoundTag configTag = npcProject.serializeNpcConfig(Platform.getFrozenRegistry());
                 customNpc.readAdditionalSaveData(configTag);
 
@@ -203,7 +203,7 @@ public class NPCPreviewView extends View implements INpcEditorSlotView {
             }
 
             if (sceneView().cullBoxVisible && sceneView().editor.getCurrentProject() instanceof NPCProject npcProject) {
-                AABB cullBox = npcProject.npc.npcConfig.getNpcData(NpcDynamicModel.class).getAabb();
+                AABB cullBox = npcProject.npc.getNpcData(NpcDynamicModel.class).getAabb();
                 if (cullBox != AABB.INFINITE) {
                     RenderSystem.enableBlend();
                     RenderSystem.disableDepthTest();

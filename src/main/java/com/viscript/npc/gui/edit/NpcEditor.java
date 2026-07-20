@@ -13,25 +13,18 @@ import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.ViScriptNpcRegistries;
-import com.viscript.npc.gui.edit.view.NPCPreviewView;
-import com.viscript.npc.gui.edit.view.INpcEditorSlotView;
-import com.viscript.npc.gui.edit.view.NpcEditorContentView;
-import com.viscript.npc.gui.edit.view.NpcInspectorView;
-import com.viscript.npc.gui.edit.view.NpcListView;
 import com.viscript.npc.gui.edit.page.INpcEditorPage;
+import com.viscript.npc.gui.edit.view.*;
 import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
 import com.viscript.npc.util.ViScriptNpcClientUtil;
-import com.viscript_lib.gui.editor.EditorFileFormat;
-import com.viscript_lib.gui.editor.EditorFileNames;
-import com.viscript_lib.gui.editor.EditorServerUploads;
-import com.viscript_lib.gui.editor.EditorUploadAction;
-import com.viscript_lib.gui.editor.ProjectFileEditor;
+import com.viscript_lib.gui.editor.*;
+import dev.vfyjxf.taffy.style.AlignItems;
+import dev.vfyjxf.taffy.style.FlexDirection;
+import lombok.Getter;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
-import dev.vfyjxf.taffy.style.AlignItems;
-import dev.vfyjxf.taffy.style.FlexDirection;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.File;
@@ -49,6 +42,7 @@ public class NpcEditor extends ProjectFileEditor {
     private static final float PROJECT_TAB_MAX_WIDTH = 220.0f;
     private static final float PROJECT_TAB_MIN_WIDTH = 90.0f;
 
+    @Getter
     public final NpcListView npcListView = new NpcListView(this);
     private final UIElement npcEditorPageBar = new UIElement();
     private final Map<String, INpcEditorPage> npcEditorPages = new LinkedHashMap<>();
@@ -71,6 +65,7 @@ public class NpcEditor extends ProjectFileEditor {
     private boolean npcAiWorldTestRightWasCollapsed;
 
     public NpcEditor() {
+        registerProjectType(NPCProject.PROVIDER);
         this.icon.style(style -> style.backgroundTexture(ICON));
         detachDefaultInspectorView();
         initNpcEditorPageBar();
@@ -194,10 +189,6 @@ public class NpcEditor extends ProjectFileEditor {
             npcPreviewView = new NPCPreviewView(this);
         }
         return npcPreviewView;
-    }
-
-    public NpcListView getNpcListView() {
-        return npcListView;
     }
 
     public NpcEditorContentView createPageContentView(INpcEditorPage page, NPCProject project) {
@@ -375,7 +366,7 @@ public class NpcEditor extends ProjectFileEditor {
         if (!npcType.isBlank()) {
             return npcType;
         }
-        NpcBasicsSetting basics = project.npc.npcConfig.getNpcData(NpcBasicsSetting.class);
+        NpcBasicsSetting basics = project.npc.getNpcData(NpcBasicsSetting.class);
         if (basics != null && !basics.getCustomName().isBlank()) {
             return basics.getCustomName();
         }

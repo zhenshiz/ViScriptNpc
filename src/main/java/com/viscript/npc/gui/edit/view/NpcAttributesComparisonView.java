@@ -61,8 +61,8 @@ public class NpcAttributesComparisonView extends View implements INpcEditorSlotV
         addGroup("viscript_npc.editor.attributes.group.core", List.of(
                 row("npcConfig.npcAttributes.maxHealth", current, NpcAttributes::getMaxHealth),
                 row("npcConfig.npcAttributes.movementSpeed", current, NpcAttributes::getMovementSpeed),
-                row("npcConfig.npcAttributes.combatRegenRate", current, attributes -> attributes.getCombatRegenRate()),
-                row("npcConfig.npcAttributes.outOfCombatRegenRate", current, attributes -> attributes.getOutOfCombatRegenRate())
+                row("npcConfig.npcAttributes.combatRegenRate", current, NpcAttributes::getCombatRegenRate),
+                row("npcConfig.npcAttributes.outOfCombatRegenRate", current, NpcAttributes::getOutOfCombatRegenRate)
         ));
 
         addGroup("viscript_npc.editor.attributes.group.offense", List.of(
@@ -209,7 +209,7 @@ public class NpcAttributesComparisonView extends View implements INpcEditorSlotV
     @Nullable
     private NpcAttributes getCurrentAttributes() {
         if (editor.getCurrentProject() instanceof NPCProject npcProject) {
-            return npcProject.npc.npcConfig.getNpcData(NpcAttributes.class);
+            return npcProject.npc.getNpcData(NpcAttributes.class);
         }
         return null;
     }

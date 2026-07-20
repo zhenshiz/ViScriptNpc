@@ -29,7 +29,7 @@ import org.jetbrains.annotations.NotNull;
 @LDLRegister(name = "npc_basics_setting", registry = INpcData.ID)
 public class NpcBasicsSetting implements INpcData {
     @Configurable(name = "npcConfig.npcBasicsSetting.type",tips = "npcConfig.npcBasicsSetting.type.tips")
-    private String type = "";
+    private String npcId = "";
     @Configurable(name = "npcConfig.npcBasicsSetting.customName")
     private String customName = "ViScript NPC";
     @Configurable(name = "npcConfig.npcBasicsSetting.customSubName")

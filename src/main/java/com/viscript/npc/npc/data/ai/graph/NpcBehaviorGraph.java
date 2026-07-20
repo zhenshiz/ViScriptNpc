@@ -13,27 +13,12 @@ import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.NodeOption;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
 import com.viscript.npc.ViScriptNpc;
-import com.viscript.npc.npc.data.ai.graph.node.FindNearestPlayerNode;
-import com.viscript.npc.npc.data.ai.graph.node.FollowTargetNode;
-import com.viscript.npc.npc.data.ai.graph.node.HasTargetNode;
-import com.viscript.npc.npc.data.ai.graph.node.IdleNode;
-import com.viscript.npc.npc.data.ai.graph.node.InverterNode;
-import com.viscript.npc.npc.data.ai.graph.node.IsTargetInRangeNode;
-import com.viscript.npc.npc.data.ai.graph.node.LookAtTargetNode;
-import com.viscript.npc.npc.data.ai.graph.node.MeleeAttackTargetNode;
-import com.viscript.npc.npc.data.ai.graph.node.NpcBehaviorNode;
-import com.viscript.npc.npc.data.ai.graph.node.RootNode;
-import com.viscript.npc.npc.data.ai.graph.node.SelectorNode;
-import com.viscript.npc.npc.data.ai.graph.node.SequenceNode;
+import com.viscript.npc.npc.data.ai.graph.node.*;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import org.joml.Vector2f;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public class NpcBehaviorGraph extends Graph {
     public static final GraphNodeRegistry NODE_REGISTRY = GraphNodeRegistry.create(ViScriptNpc.id("npc_behavior"), NpcBehaviorGraph.class);

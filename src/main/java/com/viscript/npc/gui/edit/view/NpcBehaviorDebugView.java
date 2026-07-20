@@ -227,7 +227,7 @@ public class NpcBehaviorDebugView extends View implements INpcEditorSlotView {
         }
         try {
             graphViewSupplier.get().syncGraphToProject();
-            NpcAI ai = project.npc.npcConfig.getNpcData(NpcAI.class);
+            NpcAI ai = project.npc.getNpcData(NpcAI.class);
             if (ai == null) {
                 return;
             }
@@ -279,7 +279,7 @@ public class NpcBehaviorDebugView extends View implements INpcEditorSlotView {
             return;
         }
         project.serializeNpcConfig(Platform.getFrozenRegistry());
-        NpcAI ai = project.npc.npcConfig.getNpcData(NpcAI.class);
+        NpcAI ai = project.npc.getNpcData(NpcAI.class);
         if (ai == null) {
             compileLabel.setText(Component.translatable("viscript_npc.editor.ai_debug.no_ai_config"));
             return;

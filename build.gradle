@@ -149,6 +149,7 @@ neoForge {
             }
 
             logLevel = org.slf4j.event.Level.DEBUG
+            systemProperty("terminal.jline", "true")
         }
     }
 

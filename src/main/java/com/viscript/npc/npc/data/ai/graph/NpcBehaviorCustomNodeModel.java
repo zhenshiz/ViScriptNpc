@@ -1,28 +1,20 @@
 package com.viscript.npc.npc.data.ai.graph;
 
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.Capabilities;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.ChangeHint;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.ContextualMenuHelpers;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.ContextualMenuItem;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.IPort;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.*;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.graph.GraphModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.CustomNodeModelImpl;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.ICustomNodeModel;
 import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.PortModel;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.node.Node;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.api.port.IPort;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.ModelState;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
+import com.viscript.npc.npc.data.ai.graph.node.NpcBehaviorNode;
 import com.viscript.npc.npc.data.ai.graph.node.SelectorNode;
 import com.viscript.npc.npc.data.ai.graph.node.SequenceNode;
-import com.viscript.npc.npc.data.ai.graph.node.NpcBehaviorNode;
 import lombok.Getter;
 import net.minecraft.network.chat.Component;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public class NpcBehaviorCustomNodeModel extends CustomNodeModelImpl {
     private static final int NO_USER_NODE_COLOR = 0;

@@ -12,9 +12,9 @@ import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.npc.data.ai.IntentionEntry;
 import com.viscript.npc.npc.data.ai.NpcAI;
-import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorTreeIntention;
 import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorDebugSnapshot;
 import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorRuntime;
+import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorTreeIntention;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
 import com.viscript.npc.npc.data.attributes.RangedConfig;
@@ -47,7 +47,9 @@ import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.ai.navigation.WaterBoundPathNavigation;
 import net.minecraft.world.entity.monster.CrossbowAttackMob;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.*;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ProjectileWeaponItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -83,6 +85,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@SuppressWarnings("deprecation")
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
@@ -340,13 +343,16 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     }
 
     @Override
-    public void readAdditionalSaveData(CompoundTag compoundTag) {
-        super.readAdditionalSaveData(compoundTag);
-        NpcAttachmentType.getAttachmentClasses().forEach(clazz -> {
-            INpcData npcAttachment = this.getNpcAttachment(clazz);
-            npcAttachment.deserializeNBT(Platform.getFrozenRegistry(), compoundTag);
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        if (!tag.contains("neoforge:attachments")) NpcAttachmentType.getAttachmentClasses().forEach(clazz -> {
+            try {
+                INpcData npcAttachment = clazz.getConstructor().newInstance();
+                npcAttachment.deserializeNBT(Platform.getFrozenRegistry(), tag);
+                setData(NpcAttachmentType.getAttachment(clazz), npcAttachment);
+            } catch (Exception ignored) {}
         });
-        if (!level().isClientSide && compoundTag.contains("mind")) {
+        if (!level().isClientSide && tag.contains("mind")) {
             mind = null;
             behaviorTreeIntention = null;
             mindConfigHash = 0;
@@ -363,7 +369,6 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     }
 
     public void updateNpcState() {
-        NpcAttachmentType.getAttachmentClasses().forEach(clazz -> syncData(NpcAttachmentType.getAttachment(clazz)));
         //基础信息
         NpcBasicsSetting npcBasicsSetting = getNpcBasicsSetting();
         this.setAttributeBaseValue(Attributes.SCALE, npcBasicsSetting.getModeSize());
@@ -589,7 +594,7 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     }
 
     public String getNpcType() {
-        return this.getNpcBasicsSetting().getType();
+        return this.getNpcBasicsSetting().getNpcId();
     }
 
     private void setAttributeBaseValue(Holder<Attribute> attribute, double value) {

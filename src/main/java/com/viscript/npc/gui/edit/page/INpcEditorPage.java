@@ -1,8 +1,8 @@
 package com.viscript.npc.gui.edit.page;
 
+import com.lowdragmc.lowdraglib2.configurator.ui.Configurator;
 import com.lowdragmc.lowdraglib2.editor.ui.View;
 import com.lowdragmc.lowdraglib2.editor.ui.view.InspectorView;
-import com.lowdragmc.lowdraglib2.configurator.ui.Configurator;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.registry.ILDLRegisterClient;
@@ -60,7 +60,7 @@ public interface INpcEditorPage extends ILDLRegisterClient<INpcEditorPage, Suppl
     }
 
     default void inspect(NpcEditor editor, NPCProject project, InspectorView inspectorView) {
-        inspectorView.inspect(project.npc.npcConfig.createPageConfigurable(this),
+        inspectorView.inspect(project.npc.createPageConfigurable(this),
                 configurator -> onInspectorConfiguratorChanged(editor, project, configurator));
     }
 

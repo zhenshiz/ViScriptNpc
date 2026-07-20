@@ -10,7 +10,6 @@
   "client": [
     "GeoRendererMixin",
     "LivingEntityRenderMixin",
-    "LivingEntityRendererAccessor",
     "MinecraftInteractionAccessor",
     "MouseHandlerAccessor",
     "NpcAiWorldCameraMixin",

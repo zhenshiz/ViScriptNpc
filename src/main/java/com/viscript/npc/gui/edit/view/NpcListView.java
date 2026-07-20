@@ -5,11 +5,7 @@ import com.lowdragmc.lowdraglib2.editor.ui.View;
 import com.lowdragmc.lowdraglib2.gui.ColorPattern;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.data.TextWrap;
-import com.lowdragmc.lowdraglib2.gui.ui.elements.Button;
-import com.lowdragmc.lowdraglib2.gui.ui.elements.Dialog;
-import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
-import com.lowdragmc.lowdraglib2.gui.ui.elements.ScrollerView;
-import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
+import com.lowdragmc.lowdraglib2.gui.ui.elements.*;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
 import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
 import com.viscript.npc.ViScriptNpc;
@@ -17,6 +13,7 @@ import com.viscript.npc.gui.edit.NPCProject;
 import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.network.c2s.C2SPayload;
 import com.viscript.npc.npc.CustomNpc;
+import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.nbt.CompoundTag;
@@ -32,6 +29,7 @@ public class NpcListView extends View implements INpcEditorSlotView {
     private final TextField filterField = new TextField();
     private final ScrollerView scrollerView = new ScrollerView();
     private final List<NpcListEntry> npcEntries = new ArrayList<>();
+    @Getter
     private int selectedEntityId = -1;
 
     public NpcListView(NpcEditor editor) {
@@ -128,10 +126,6 @@ public class NpcListView extends View implements INpcEditorSlotView {
         }
     }
 
-    public int getSelectedEntityId() {
-        return selectedEntityId;
-    }
-
     private UIElement createInfoLabel(String key) {
         return new Label()
                 .setText(Component.translatable(key))
@@ -158,7 +152,7 @@ public class NpcListView extends View implements INpcEditorSlotView {
 
     private void createNewNpc() {
         if (editor.getCurrentProject() instanceof NPCProject npcProject) {
-            CompoundTag tag = npcProject.serializeNpcConfig(Platform.getFrozenRegistry());
+            CompoundTag tag = npcProject.npc.serializeNBT(Platform.getFrozenRegistry());
             tag.putString("npcType", npcProject.getCurrentNpcType());
             RPCPacketDistributor.rpcToServer(C2SPayload.CREATE_NEW_NPC, tag);
         }
@@ -197,7 +191,7 @@ public class NpcListView extends View implements INpcEditorSlotView {
             return;
         }
         if (editor.getCurrentProject() instanceof NPCProject npcProject) {
-            CompoundTag tag = npcProject.serializeNpcConfig(Platform.getFrozenRegistry());
+            CompoundTag tag = npcProject.npc.serializeNBT(Platform.getFrozenRegistry());
             tag.putString("npcType", npcProject.getCurrentNpcType());
             RPCPacketDistributor.rpcToServer(C2SPayload.OVERWRITE_NPC, selectedEntityId, tag);
         }
@@ -215,7 +209,7 @@ public class NpcListView extends View implements INpcEditorSlotView {
         project.initNewProject();
         CompoundTag tag = new CompoundTag();
         npc.saveWithoutId(tag);
-        project.npc.npcConfig.deserializeNBT(Platform.getFrozenRegistry(), tag);
+        project.npc.deserializeNBT(Platform.getFrozenRegistry(), tag);
         editor.loadProject(project, null);
     }
 

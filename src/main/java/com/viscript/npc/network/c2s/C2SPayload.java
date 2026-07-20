@@ -1,9 +1,9 @@
 package com.viscript.npc.network.c2s;
 
+import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacket;
 import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
 import com.lowdragmc.lowdraglib2.syncdata.rpc.RPCSender;
-import com.lowdragmc.lowdraglib2.Platform;
 import com.viscript.npc.compat.team.NpcFactionBridge;
 import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.CustomNpc;

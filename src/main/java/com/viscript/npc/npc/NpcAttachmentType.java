@@ -20,7 +20,6 @@ public class NpcAttachmentType {
     public static final DeferredRegister<AttachmentType<?>> ATTACHMENT_TYPES = DeferredRegister.create(NeoForgeRegistries.ATTACHMENT_TYPES, ViScriptNpc.MOD_ID);
 
     private static final Map<Class<? extends INpcData>, Supplier<AttachmentType<INpcData>>> NPC_DATA_ATTACHMENTS = new LinkedHashMap<>();
-    private static final Map<Class<? extends INpcData>, String> NPC_DATA_ATTACHMENT_NAMES = new LinkedHashMap<>();
 
     static {
         for (AutoRegistry.Holder<LDLRegister, INpcData, Supplier<INpcData>> npcData : ViScriptNpcRegistries.NPC_DATA) {
@@ -40,14 +39,6 @@ public class NpcAttachmentType {
         return Collections.unmodifiableSet(NPC_DATA_ATTACHMENTS.keySet());
     }
 
-    public static String getAttachmentName(Class<? extends INpcData> clazz) {
-        String name = NPC_DATA_ATTACHMENT_NAMES.get(clazz);
-        if (name == null) {
-            throw new IllegalArgumentException("Unknown npc data type: " + clazz.getName());
-        }
-        return name;
-    }
-
     private static void register(String name, Class<? extends INpcData> clazz, Supplier<INpcData> supplier) {
         DeferredHolder<AttachmentType<?>, AttachmentType<INpcData>> attachmentTypeDeferredHolder = ATTACHMENT_TYPES.register(
                 name,
@@ -58,6 +49,5 @@ public class NpcAttachmentType {
                         .build()
         );
         NPC_DATA_ATTACHMENTS.put(clazz, attachmentTypeDeferredHolder);
-        NPC_DATA_ATTACHMENT_NAMES.put(clazz, name);
     }
 }

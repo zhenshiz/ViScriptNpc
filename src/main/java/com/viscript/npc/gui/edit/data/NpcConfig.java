@@ -2,8 +2,9 @@ package com.viscript.npc.gui.edit.data;
 
 import com.lowdragmc.lowdraglib2.configurator.IConfigurable;
 import com.lowdragmc.lowdraglib2.configurator.ui.ConfiguratorGroup;
-import com.viscript.npc.gui.edit.page.INpcEditorPage;
+import com.lowdragmc.lowdraglib2.syncdata.IPersistedSerializable;
 import com.viscript.npc.ViScriptNpcRegistries;
+import com.viscript.npc.gui.edit.page.INpcEditorPage;
 import com.viscript.npc.npc.data.INpcData;
 import com.viscript.npc.util.common.StrUtil;
 import net.minecraft.core.HolderLookup;
@@ -16,7 +17,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-public class NpcConfig implements INpcData {
+public class NpcConfig implements IPersistedSerializable, IConfigurable {
     final Set<INpcData> npcData = new LinkedHashSet<>();
 
     {
@@ -50,7 +51,7 @@ public class NpcConfig implements INpcData {
 
     @Override
     public void buildConfigurator(ConfiguratorGroup father) {
-        INpcData.super.buildConfigurator(father);
+        IConfigurable.super.buildConfigurator(father);
         for (INpcData npcData : this.npcData) {
             String name = "npcConfig." + StrUtil.toCamelCase(npcData.getConfigurableName());
             ConfiguratorGroup newGroup = new ConfiguratorGroup(name, true);
@@ -60,7 +61,7 @@ public class NpcConfig implements INpcData {
     }
 
     public void buildConfigurator(ConfiguratorGroup father, ResourceLocation editorPage) {
-        INpcData.super.buildConfigurator(father);
+        IConfigurable.super.buildConfigurator(father);
         for (INpcData npcData : getNpcData(editorPage)) {
             String name = "npcConfig." + StrUtil.toCamelCase(npcData.getConfigurableName());
             ConfiguratorGroup newGroup = new ConfiguratorGroup(name, false);
@@ -71,7 +72,7 @@ public class NpcConfig implements INpcData {
 
     @Override
     public CompoundTag serializeNBT(HolderLookup.@NotNull Provider provider) {
-        CompoundTag tag = INpcData.super.serializeNBT(provider);
+        CompoundTag tag = IPersistedSerializable.super.serializeNBT(provider);
         for (INpcData npcData : this.npcData) {
             tag.put(npcData.getConfigurableName(), npcData.serializeNBT(provider));
         }
@@ -80,7 +81,7 @@ public class NpcConfig implements INpcData {
 
     @Override
     public void deserializeNBT(HolderLookup.@NotNull Provider provider, @NotNull CompoundTag tag) {
-        INpcData.super.deserializeNBT(provider, tag);
+        IPersistedSerializable.super.deserializeNBT(provider, tag);
         for (INpcData npcData : this.npcData) npcData.deserializeNBT(provider, tag);
     }
 

@@ -6,9 +6,9 @@ import com.lowdragmc.lowdraglib2.editor.resource.Resources;
 import com.lowdragmc.lowdraglib2.editor.resource.TexturesResource;
 import com.lowdragmc.lowdraglib2.editor.ui.Editor;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
-import com.viscript.npc.gui.edit.npc.NPC;
-import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
+import com.viscript.npc.gui.edit.data.NpcConfig;
 import com.viscript.npc.npc.data.ai.NpcAI;
+import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
 import com.viscript.npc.util.NpcEditorFormats;
 import com.viscript_lib.gui.editor.EditorFileFormat;
 import com.viscript_lib.gui.editor.IRuntimeFileProject;
@@ -29,11 +29,10 @@ public class NPCProject implements IRuntimeFileProject {
 
     @Getter
     private final Resources resources;
-    public NPC npc = new NPC();
+    public NpcConfig npc = new NpcConfig();
     @Nullable
     private Supplier<CompoundTag> behaviorGraphSnapshotSupplier;
-
-    public String getCurrentNpcType() {return npc.npcConfig.getNpcData(NpcBasicsSetting.class).getType();}
+    public String getCurrentNpcType() {return npc.getNpcData(NpcBasicsSetting.class).getNpcId();}
 
     public NPCProject() {
         this.resources = Resources.of(
@@ -71,7 +70,7 @@ public class NPCProject implements IRuntimeFileProject {
     public CompoundTag serializeRuntimeFile(HolderLookup.Provider provider) {
         refreshEditorSnapshots();
         CompoundTag data = npc.serializeNBT(provider);
-        NpcAI ai = npc.npcConfig.getNpcData(NpcAI.class);
+        NpcAI ai = npc.getNpcData(NpcAI.class);
         if (ai != null) {
             CompoundTag aiTag = data.getCompound(ai.getConfigurableName());
             aiTag.put("behaviorProgram", ai.getCompiledBehaviorProgram());
@@ -82,7 +81,7 @@ public class NPCProject implements IRuntimeFileProject {
 
     public CompoundTag serializeNpcConfig(HolderLookup.Provider provider) {
         refreshEditorSnapshots();
-        return npc.npcConfig.serializeNBT(provider);
+        return npc.serializeNBT(provider);
     }
 
     @Override
@@ -110,7 +109,7 @@ public class NPCProject implements IRuntimeFileProject {
         if (behaviorGraphSnapshotSupplier == null) {
             return;
         }
-        NpcAI ai = npc.npcConfig.getNpcData(NpcAI.class);
+        NpcAI ai = npc.getNpcData(NpcAI.class);
         if (ai != null) {
             CompoundTag graphTag = behaviorGraphSnapshotSupplier.get();
             if (graphTag != null && !graphTag.isEmpty()) {

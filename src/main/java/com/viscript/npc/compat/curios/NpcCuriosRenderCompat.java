@@ -1,7 +1,6 @@
 package com.viscript.npc.compat.curios;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.viscript.npc.mixin.LivingEntityRendererAccessor;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.data.inventory.NpcCuriosIntegration;
 import net.minecraft.client.model.EntityModel;
@@ -43,15 +42,15 @@ public final class NpcCuriosRenderCompat {
         return false;
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"unchecked"})
     private static <T extends LivingEntity, M extends EntityModel<T>> void renderDynamicLivingModelWithCurios(
             CustomNpc npc, LivingEntity entity, LivingEntityRenderer<?, ?> renderer, float entityYaw, float partialTicks,
             PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         LivingEntityRenderer<T, M> typedRenderer = (LivingEntityRenderer<T, M>) renderer;
         T typedEntity = (T) entity;
         RenderLayer<T, M> layer = new DynamicCuriosLayer<>(typedRenderer, npc);
-        var layers = ((LivingEntityRendererAccessor) typedRenderer).viscript_npc$getLayers();
-        layers.add((RenderLayer) layer);
+        var layers = typedRenderer.layers;
+        layers.add(layer);
         try {
             typedRenderer.render(typedEntity, entityYaw, partialTicks, poseStack, buffer, packedLight);
         } finally {

@@ -13,39 +13,32 @@ import com.viscript.npc.network.c2s.C2SPayload;
 import com.viscript.npc.npc.CustomNpc;
 import dev.latvian.mods.kubejs.typings.Info;
 import dev.vfyjxf.taffy.style.TaffyPosition;
+import lombok.Getter;
 import net.minecraft.client.Camera;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.level.ClipContext;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.EntityHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.*;
 import org.jetbrains.annotations.Nullable;
 import org.joml.AxisAngle4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ViScriptNpcClientUtil {
     private static final double NPC_AI_WORLD_TEST_TARGET_RADIUS = 64.0D;
@@ -58,7 +51,9 @@ public class ViScriptNpcClientUtil {
     private static boolean npcAiWorldFixedCamera;
     @Nullable
     private static Vec3 npcAiWorldFixedCameraPosition;
+    @Getter
     private static float npcAiWorldFixedCameraYaw;
+    @Getter
     private static float npcAiWorldFixedCameraPitch;
     private static boolean npcEditorMouseKnown;
     private static double npcEditorMouseX;
@@ -502,14 +497,6 @@ public class ViScriptNpcClientUtil {
         return npcAiWorldFixedCameraPosition == null ? Vec3.ZERO : npcAiWorldFixedCameraPosition;
     }
 
-    public static float getNpcAiWorldFixedCameraYaw() {
-        return npcAiWorldFixedCameraYaw;
-    }
-
-    public static float getNpcAiWorldFixedCameraPitch() {
-        return npcAiWorldFixedCameraPitch;
-    }
-
     private static void updateNpcAiWorldBlockHit() {
         Minecraft minecraft = Minecraft.getInstance();
         WorldRay ray = getNpcAiWorldMouseRay();
@@ -690,7 +677,7 @@ public class ViScriptNpcClientUtil {
         editorWindow.retoreWindow();
         int guiWidth = minecraft.getWindow().getGuiScaledWidth();
         int guiHeight = minecraft.getWindow().getGuiScaledHeight();
-        float width = Math.min(guiWidth, Math.max(360f, guiWidth * 0.40f));
+        float width = Math.clamp(guiWidth * 0.40f, 360f, guiWidth);
         float height = guiHeight;
         float left = guiWidth / 2f - width;
         float top = -guiHeight / 2f;

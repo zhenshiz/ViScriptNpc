@@ -1,13 +1,13 @@
 package com.viscript.npc.gui.edit.view;
 
 import com.lowdragmc.lowdraglib2.nodegraphtookit.editor.GraphEditorView;
+import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.AbstractNodeModel;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.gui.edit.NPCProject;
 import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.gui.edit.page.INpcEditorPage;
 import com.viscript.npc.npc.data.ai.NpcAI;
 import com.viscript.npc.npc.data.ai.graph.NpcBehaviorGraph;
-import com.lowdragmc.lowdraglib2.nodegraphtookit.model.node.AbstractNodeModel;
 import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.Nullable;
 
@@ -80,7 +80,7 @@ public class NpcBehaviorGraphView extends GraphEditorView implements INpcEditorS
     }
 
     private void loadFromProject(NPCProject project) {
-        NpcAI ai = project.npc.npcConfig.getNpcData(NpcAI.class);
+        NpcAI ai = project.npc.getNpcData(NpcAI.class);
         NpcBehaviorGraph graph = new NpcBehaviorGraph();
         if (ai != null) {
             CompoundTag graphTag = ai.getBehaviorGraph();
@@ -90,7 +90,7 @@ public class NpcBehaviorGraphView extends GraphEditorView implements INpcEditorS
         }
         graph.ensureDefaultRoot();
         loadGraph(graph, tag -> {
-            NpcAI currentAi = project.npc.npcConfig.getNpcData(NpcAI.class);
+            NpcAI currentAi = project.npc.getNpcData(NpcAI.class);
             if (currentAi != null) {
                 currentAi.setBehaviorGraph(tag);
             }
@@ -104,7 +104,7 @@ public class NpcBehaviorGraphView extends GraphEditorView implements INpcEditorS
         if (project == null || getGraph() == null) {
             return;
         }
-        NpcAI ai = project.npc.npcConfig.getNpcData(NpcAI.class);
+        NpcAI ai = project.npc.getNpcData(NpcAI.class);
         if (ai != null) {
             ai.setBehaviorGraph(serializeGraph());
         }
