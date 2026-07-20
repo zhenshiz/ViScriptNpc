@@ -17,6 +17,7 @@ public class NpcRegister {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(BuiltInRegistries.ENTITY_TYPE, ViScriptNpc.MOD_ID);
 
     public static final DeferredHolder<EntityType<?>, EntityType<CustomNpc>> CUSTOM_NPC;
+    public static final DeferredHolder<EntityType<?>, EntityType<NpcProjectile>> CUSTOM_NPC_PROJECTILE;
 
     @SubscribeEvent
     public static void registerAttributes(EntityAttributeCreationEvent event) {
@@ -31,6 +32,14 @@ public class NpcRegister {
                 () -> EntityType.Builder.of(CustomNpc::new, MobCategory.MISC)
                         .sized(0.6f, 2f)
                         .build(ViScriptNpc.id("custom_npc").toString())
+        );
+        CUSTOM_NPC_PROJECTILE = ENTITY_TYPES.register(
+                "custom_npc_projectile",
+                () -> EntityType.Builder.<NpcProjectile>of(NpcProjectile::new, MobCategory.MISC)
+                        .sized(0.25f, 0.25f)
+                        .clientTrackingRange(4)
+                        .updateInterval(10)
+                        .build(ViScriptNpc.id("custom_npc_projectile").toString())
         );
     }
 }

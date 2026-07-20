@@ -17,18 +17,14 @@ public class NpcAttributes implements INpcData {
     @Configurable(name = "npcConfig.npcAttributes.movementSpeed")
     @ConfigNumber(range = {0, 1024}, wheel = 0.1)
     private double movementSpeed = 0.7;
-    @Configurable(name = "npcConfig.npcAttributes.followRange")
-    @ConfigNumber(range = {0, 2048}, wheel = 0.1)
-    private double followRange = 32;
     @Configurable(name = "npcConfig.npcAttributes.meleeConfig", subConfigurable = true)
     private MeleeConfig meleeConfig = new MeleeConfig();
+    @Configurable(name = "npcConfig.npcAttributes.rangedConfig", subConfigurable = true)
+    private RangedConfig rangedConfig = new RangedConfig();
     @Configurable(name = "npcConfig.npcAttributes.resistanceConfig", subConfigurable = true)
     private ResistanceConfig resistanceConfig = new ResistanceConfig();
     @Configurable(name = "npcConfig.npcAttributes.defenseConfig", subConfigurable = true)
     private DefenseConfig defenseConfig = new DefenseConfig();
-    //是否免疫火焰
-    @Configurable(name = "npcConfig.npcAttributes.isImmuneToFire")
-    private boolean isImmuneToFire = false;
     //是否会溺水
     @Configurable(name = "npcConfig.npcAttributes.isCanDrown")
     private boolean isCanDrown = false;

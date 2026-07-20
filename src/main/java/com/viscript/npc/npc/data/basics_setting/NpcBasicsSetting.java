@@ -53,8 +53,6 @@ public class NpcBasicsSetting implements INpcData {
     private ResourceLocation capeTexture = ViScriptNpc.id("textures/default_cape.png");
     @Configurable(name = "npcConfig.npcBasicsSetting.invulnerable")
     private boolean invulnerable = true;
-    @Configurable(name = "npcConfig.npcBasicsSetting.isNoAI")
-    private boolean isNoAI = false;
     @Configurable(name = "npcConfig.npcBasicsSetting.isNoGravity")
     private boolean isNoGravity = false;
 

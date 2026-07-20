@@ -6,19 +6,20 @@ import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.compat.curios.NpcCuriosCompat;
+import com.viscript.npc.compat.team.NpcFactionBridge;
 import com.viscript.npc.event.neoforge.NpcEvent;
 import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.data.INpcData;
+import com.viscript.npc.npc.data.ai.IntentionEntry;
 import com.viscript.npc.npc.data.ai.NpcAI;
-import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorDebugSnapshot;
-import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorRuntime;
 import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
+import com.viscript.npc.npc.data.attributes.RangedConfig;
 import com.viscript.npc.npc.data.attributes.ResistanceConfig;
 import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
 import com.viscript.npc.npc.data.inventory.LootTableConfig;
 import com.viscript.npc.npc.data.inventory.NpcInventory;
-import com.viscript.npc.npc.data.mod_integrations.NpcModIntegrations;
+import com.viscript.npc.npc.data.mod_integrations.NpcViScriptTeamIntegration;
 import com.viscript.npc.npc.data.model.NpcDynamicModel;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -47,6 +48,7 @@ import net.minecraft.world.item.*;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
@@ -60,16 +62,20 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import net.neoforged.neoforge.event.OnDatapackSyncEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.entity.living.*;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
+import org.thexeler.MindMachine;
+import org.thexeler.api.IntentionTypeRegistry;
+import org.thexeler.api.MindMachineManager;
+import org.thexeler.intention.BaseIntention;
 
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @ParametersAreNonnullByDefault
@@ -77,8 +83,11 @@ import java.util.stream.Collectors;
 public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     protected final WaterBoundPathNavigation waterNavigation;
     protected final GroundPathNavigation groundNavigation;
-    private final NpcBehaviorRuntime behaviorRuntime = new NpcBehaviorRuntime(this);
+    @Nullable
+    private MindMachine mind;
+    private int mindConfigHash;
     public static Set<String> lootTableKeys = Set.of();
+    public static Set<String> factionIds = Set.of();
 
     //披风用参数
     public double xCloakO;
@@ -91,6 +100,8 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     public float bob;
     @Nullable
     private Quaternionf previewCameraOrientation;
+    @Nullable
+    private Vec3 commandPathTestTarget;
 
     public CustomNpc(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
@@ -113,31 +124,7 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
 
     @Override
     protected void registerGoals() {
-/*        this.goalSelector.addGoal(0, new FloatGoal(this));
-        this.goalSelector.addGoal(3, new RangedAttackGoal(this, 1.0, 40, 15) {
-            @Override
-            public boolean canUse() {return super.canUse() && isHolding(stack -> stack.getItem() instanceof TridentItem);}
-
-            @Override
-            public void start() {
-                setAggressive(true);
-                startUsingItem(InteractionHand.MAIN_HAND);
-            }
-
-            @Override
-            public void stop() {
-                super.stop();
-                stopUsingItem();
-                setAggressive(false);
-            }
-        });
-        this.goalSelector.addGoal(3, new RangedCrossbowAttackGoal<>(this, 1.0, 15));
-        this.goalSelector.addGoal(3, new RangedBowAttackGoal<>(this, 1.0F, 20, 15.0F));
-        this.goalSelector.addGoal(4, new MeleeAttackGoal(this, 1.0, false));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, IronGolem.class, true));
-        this.goalSelector.addGoal(6, new WaterAvoidingRandomStrollGoal(this, 1.0F));
-        this.goalSelector.addGoal(7, new LookAtPlayerGoal(this, Player.class, 10.0f));
-        this.goalSelector.addGoal(8, new RandomLookAroundGoal(this));*/
+        // Vanilla goals are intentionally empty. Server-side decision making is owned by AM MindMachine.
     }
 
     @Override
@@ -147,14 +134,6 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     @Override
     public void onCrossbowAttackPerformed() {
         this.noActionTime = 0;
-    }
-
-    private ItemStack getHoldingWeapon() {
-        Predicate<ItemStack> p = stack -> {
-            Item item = stack.getItem();
-            return item instanceof TridentItem || item instanceof CrossbowItem || item instanceof BowItem;
-        };
-        return p.test(getMainHandItem()) ? getMainHandItem() : p.test(getOffhandItem()) ? getOffhandItem() : ItemStack.EMPTY;
     }
 
     @Override
@@ -167,43 +146,39 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
 
     @Override
     public void performRangedAttack(LivingEntity target, float v) {
-/*        ItemStack weapon = getHoldingWeapon();
-        switch (weapon.getItem()) {
-            case BowItem bow -> {
-                AbstractArrow abstractarrow = ((ArrowItem) Items.ARROW).createArrow(level(), new ItemStack(Items.ARROW), this, weapon);
-                abstractarrow = bow.customArrow(abstractarrow, getProjectile(weapon), weapon);
+    }
 
-                double d0 = target.getX() - getX();
-                double d1 = target.getY(0.3333333333333333) - abstractarrow.getY();
-                double d2 = target.getZ() - getZ();
-                double d3 = Math.sqrt(d0 * d0 + d2 * d2);
-                abstractarrow.shoot(d0, d1 + d3 * 0.2, d2, 1.6F, 14f - level().getDifficulty().getId() * 4);
-                playSound(SoundEvents.SKELETON_SHOOT, 1.0F, 1.0F / (getRandom().nextFloat() * 0.4F + 0.8F));
-                level().addFreshEntity(abstractarrow);
-            }
-            case CrossbowItem ignored -> performCrossbowAttack(this, 1.6F);
-            case TridentItem ignored -> {
-                ThrownTrident throwntrident = new ThrownTrident(level(), this, new ItemStack(Items.TRIDENT));
-                double d0 = target.getX() - getX();
-                double d1 = target.getY(0.3333333333333333) - throwntrident.getY();
-                double d2 = target.getZ() - getZ();
-                double d3 = Math.sqrt(d0 * d0 + d2 * d2);
-                throwntrident.shoot(d0, d1 + d3 * 0.2, d2, 1.6F, 14f - level().getDifficulty().getId() * 4);
-                playSound(SoundEvents.DROWNED_SHOOT, 1.0F, 1.0F / (getRandom().nextFloat() * 0.4F + 0.8F));
-                level().addFreshEntity(throwntrident);
-            }
-            default -> {}
-        }*/
+    public boolean shootRangedProjectile(LivingEntity target, int projectilesPerShot, float inaccuracy) {
+        if (target == null || !target.isAlive()) {
+            return false;
+        }
+        RangedConfig rangedConfig = getNpcAttributes().getRangedConfig();
+        int count = Mth.clamp(projectilesPerShot, 1, 64);
+        float speed = Math.max(0.1F, rangedConfig.getSpeed());
+        boolean spawned = false;
+        for (int i = 0; i < count; i++) {
+            NpcProjectile projectile = new NpcProjectile(level(), this);
+            projectile.configureFrom(rangedConfig);
+            double x = target.getX() - this.getX();
+            double y = target.getY(0.3333333333333333D) - projectile.getY();
+            double z = target.getZ() - this.getZ();
+            double horizontal = Math.sqrt(x * x + z * z);
+            projectile.shoot(x, y + horizontal * 0.2D, z, speed, Math.max(0.0F, inaccuracy));
+            level().addFreshEntity(projectile);
+            spawned = true;
+        }
+        if (spawned) {
+            playSound(rangedConfig.getShootSoundEvent(), 1.0F, 1.0F / (getRandom().nextFloat() * 0.4F + 0.8F));
+        }
+        return spawned;
     }
 
     public void updateSwimming() { // 临时的
         if (!this.level().isClientSide) {
-            if (this.isEffectiveAi() && this.isInWater()) {
-                this.navigation = this.waterNavigation;
+            if (this.isInWater()) {
                 this.setSwimming(true);
                 setPose(Pose.SWIMMING);
             } else {
-                this.navigation = this.groundNavigation;
                 this.setSwimming(false);
                 setPose(Pose.STANDING);
             }
@@ -214,10 +189,13 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     public void tick() {
         super.tick();
         NeoForge.EVENT_BUS.post(new NpcEvent.Tick(this));
-        // MindMachine
-//        mind.tick();
         if (!level().isClientSide()) {
-            behaviorRuntime.tick();
+            if (tickCommandPathTestOverride()) {
+                return;
+            }
+            if (mind != null) {
+                mind.tick();
+            }
         } else {
             this.moveCloak();
             Entity entity = getNpcDynamicModel().getEntity(this);
@@ -226,6 +204,36 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
             } catch (Exception ignored) {
             }
         }
+    }
+
+    public boolean startCommandPathTest(Path path, Vec3 target, double speed) {
+        commandPathTestTarget = target;
+        getNavigation().stop();
+        boolean moving = getNavigation().moveTo(path, speed);
+        if (!moving) {
+            commandPathTestTarget = null;
+        }
+        return moving;
+    }
+
+    public void stopCommandPathTest() {
+        commandPathTestTarget = null;
+        getNavigation().stop();
+    }
+
+    public boolean isCommandPathTestActive() {
+        return commandPathTestTarget != null;
+    }
+
+    private boolean tickCommandPathTestOverride() {
+        if (commandPathTestTarget == null) {
+            return false;
+        }
+        if (!isAlive() || getNavigation().isDone() || distanceToSqr(commandPathTestTarget) <= 2.25D) {
+            stopCommandPathTest();
+            return false;
+        }
+        return true;
     }
 
     @Override
@@ -331,7 +339,19 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
             INpcData npcAttachment = this.getNpcAttachment(clazz);
             npcAttachment.deserializeNBT(Platform.getFrozenRegistry(), compoundTag);
         });
+        if (!level().isClientSide && compoundTag.contains("mind")) {
+            mind = MindMachine.deserialize(this, compoundTag.getCompound("mind"));
+            mindConfigHash = currentMindConfigHash(getNpcAI());
+        }
         updateNpcState();
+    }
+
+    @Override
+    public void addAdditionalSaveData(CompoundTag compoundTag) {
+        super.addAdditionalSaveData(compoundTag);
+        if (mind != null) {
+            compoundTag.put("mind", mind.serialize());
+        }
     }
 
     public void updateNpcState() {
@@ -340,7 +360,6 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         NpcBasicsSetting npcBasicsSetting = getNpcBasicsSetting();
         this.setAttributeBaseValue(Attributes.SCALE, npcBasicsSetting.getModeSize());
         this.setInvulnerable(npcBasicsSetting.isInvulnerable());
-        this.setNoAi(npcBasicsSetting.isNoAI());
         this.setNoGravity(npcBasicsSetting.isNoGravity());
 
         //动态模型
@@ -350,7 +369,6 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         NpcAttributes npcAttributes = getNpcAttributes();
         this.setAttributeBaseValue(Attributes.MAX_HEALTH, npcAttributes.getMaxHealth());
         this.setAttributeBaseValue(Attributes.MOVEMENT_SPEED, npcAttributes.getMovementSpeed());
-        this.setAttributeBaseValue(Attributes.FOLLOW_RANGE, npcAttributes.getFollowRange());
         //近战属性
         this.setAttributeBaseValue(Attributes.ATTACK_DAMAGE, npcAttributes.getMeleeConfig().getAttackDamage());
         this.setAttributeBaseValue(Attributes.ATTACK_KNOCKBACK, npcAttributes.getMeleeConfig().getKnockback());
@@ -360,9 +378,12 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS, npcAttributes.getDefenseConfig().getArmorToughness());
 
         //AI
-        behaviorRuntime.configure(getNpcAI());
+        NpcAI npcAI = getNpcAI();
+        this.setNoAi(npcAI.isEnabled());
+        syncMindState(npcAI);
 
         //联动模组
+        NpcFactionBridge.applyConfiguredFaction(this);
         if (ViScriptNpc.isCuriosLoaded()) {
             NpcCuriosCompat.applyCurios(this);
         }
@@ -412,9 +433,7 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         NpcAttributes npcAttributes = getNpcAttributes();
-        if (npcAttributes.isImmuneToFire() && source.is(DamageTypeTags.IS_FIRE)) {
-            return false;
-        } else if (npcAttributes.isCanDrown() && source.is(DamageTypeTags.IS_DROWNING)) {
+        if (npcAttributes.isCanDrown() && source.is(DamageTypeTags.IS_DROWNING)) {
             return false;
         } else if (npcAttributes.isFallDamage() && source.is(DamageTypeTags.IS_FALL)) {
             return false;
@@ -434,8 +453,8 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         return getNpcAttachment(NpcAttributes.class);
     }
 
-    public NpcModIntegrations getNpcModIntegrations() {
-        return getNpcAttachment(NpcModIntegrations.class);
+    public NpcViScriptTeamIntegration getNpcViScriptTeamIntegration() {
+        return getNpcAttachment(NpcViScriptTeamIntegration.class);
     }
 
     public NpcInventory getNpcInventory() {
@@ -446,66 +465,56 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         return getNpcAttachment(NpcAI.class);
     }
 
-    public NpcBehaviorDebugSnapshot getNpcBehaviorDebugSnapshot() {
-        return behaviorRuntime.getLastDebugSnapshot();
+    @Nullable
+    public MindMachine getMind() {
+        return mind;
     }
 
-    public void setNpcBehaviorDebugPaused(boolean paused) {
-        behaviorRuntime.setDebugPaused(paused);
+    public void initMind() {
+        if (this.level().isClientSide || mind != null) return;
+        initMind(getNpcAI(), currentMindConfigHash(getNpcAI()));
     }
 
-    public boolean isNpcBehaviorDebugPaused() {
-        return behaviorRuntime.isDebugPaused();
+    private void initMind(NpcAI ai, int configHash) {
+        if (this.level().isClientSide || mind != null) return;
+        mind = MindMachineManager.getInstance().createInstance(this, ai.toConfig());
+        mindConfigHash = configHash;
+        for (IntentionEntry entry : ai.getIntentions()) {
+            try {
+                BaseIntention intention = IntentionTypeRegistry.deserialize(entry.getType(), mind, entry.getData());
+                mind.addIntention(entry.getPriority(), intention);
+            } catch (IllegalArgumentException ignored) {
+                // Unknown intention type; keep the rest of the configured mind usable.
+            }
+        }
     }
 
-    public void stepNpcBehaviorDebug() {
-        behaviorRuntime.stepDebugTickNow();
+    private void syncMindState(NpcAI ai) {
+        if (this.level().isClientSide) return;
+        if (!ai.isEnabled()) {
+            clearMind();
+            return;
+        }
+
+        int configHash = currentMindConfigHash(ai);
+        if (mind == null) {
+            initMind(ai, configHash);
+        } else if (mindConfigHash != configHash) {
+            clearMind();
+            initMind(ai, configHash);
+        }
     }
 
-    public void continueNpcBehaviorDebug() {
-        behaviorRuntime.continueDebug();
+    private void clearMind() {
+        if (mind != null) {
+            MindMachineManager.getInstance().removeInstance(this);
+            mind = null;
+        }
+        mindConfigHash = 0;
     }
 
-    public void stopNpcBehaviorDebug() {
-        behaviorRuntime.stopDebug();
-    }
-
-    public void setNpcBehaviorEditorDebugTarget(@Nullable LivingEntity target) {
-        behaviorRuntime.setEditorDebugTarget(target);
-    }
-
-    public void setNpcBehaviorEditorDebugIgnoredPlayer(@Nullable UUID playerUuid) {
-        behaviorRuntime.setEditorDebugIgnoredPlayer(playerUuid);
-    }
-
-    public void clearNpcBehaviorEditorDebugIgnoredPlayer(UUID playerUuid) {
-        behaviorRuntime.clearEditorDebugIgnoredPlayer(playerUuid);
-    }
-
-    public void tickNpcBehaviorForEditorDebug() {
-        behaviorRuntime.tickForEditorDebug();
-        tickEditorDebugAiControls();
-    }
-
-    public void stepNpcBehaviorDebugForEditor() {
-        behaviorRuntime.stepDebugTickNowForEditor();
-        tickEditorDebugAiControls();
-    }
-
-    public void continueNpcBehaviorDebugForEditor() {
-        behaviorRuntime.continueDebug();
-    }
-
-    public void stopNpcBehaviorDebugForEditor() {
-        behaviorRuntime.stopDebug();
-        tickEditorDebugAiControls();
-    }
-
-    private void tickEditorDebugAiControls() {
-        navigation.tick();
-        moveControl.tick();
-        lookControl.tick();
-        jumpControl.tick();
+    private int currentMindConfigHash(NpcAI ai) {
+        return Objects.hash(ai.isEnabled(), ai.getTickRate(), ai.getNavigation(), ai.getIntentions());
     }
 
     public String getNpcType() {
@@ -588,6 +597,12 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         public static void hurtAndAttack(LivingIncomingDamageEvent event) {
             if (event.getEntity().level().isClientSide) return;
             DamageSource source = event.getSource();
+            if (event.getEntity() instanceof LivingEntity target
+                    && isNpcRelatedDamage(source, target)
+                    && !NpcFactionBridge.canHurtFromSource(source, target)) {
+                event.setCanceled(true);
+                return;
+            }
             //npc受伤
             if (event.getEntity() instanceof CustomNpc npc) {
                 DamageContainer container = event.getContainer();
@@ -602,6 +617,9 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
                 if (source.getDirectEntity() instanceof LivingEntity) {
                     currentDamage *= 1 - resistanceConfig.getMelee();
                 }
+                if (source.is(DamageTypeTags.IS_FIRE)) {
+                    currentDamage *= 1 - Mth.clamp(resistanceConfig.getFire(), 0.0f, 1.0f);
+                }
                 container.setNewDamage(currentDamage);
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.Hurt(event)).isCanceled()) {
                     event.setCanceled(true);
@@ -612,8 +630,16 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.Attack(npc, event)).isCanceled()) {
                     event.setCanceled(true);
                 }
-                npc.attack(npc, event.getEntity());
+                if (source.getDirectEntity() instanceof CustomNpc) {
+                    npc.attack(npc, event.getEntity());
+                }
             }
+        }
+
+        private static boolean isNpcRelatedDamage(DamageSource source, LivingEntity target) {
+            return target instanceof CustomNpc
+                    || source.getEntity() instanceof CustomNpc
+                    || source.getDirectEntity() instanceof NpcProjectile;
         }
 
         @SubscribeEvent
@@ -642,7 +668,19 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         @SubscribeEvent
         public static void spawn(EntityJoinLevelEvent event) {
             if (event.getEntity() instanceof CustomNpc npc) {
+                if (!npc.level().isClientSide && npc.mind == null && npc.getNpcAI().isEnabled()) {
+                    npc.initMind();
+                }
                 NeoForge.EVENT_BUS.post(new NpcEvent.Spawn(npc));
+            }
+        }
+
+        @SubscribeEvent
+        public static void despawn(EntityLeaveLevelEvent event) {
+            if (event.getEntity() instanceof CustomNpc npc) {
+                if (!event.getLevel().isClientSide && npc.mind != null) {
+                    npc.clearMind();
+                }
             }
         }
 
@@ -662,6 +700,13 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
             if (event.getEntity() instanceof CustomNpc npc) {
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.TargetEvent(npc, event)).isCanceled()) {
                     event.setCanceled(true);
+                    return;
+                }
+                LivingEntity newTarget = event.getNewAboutToBeSetTarget();
+                if (newTarget != null
+                        && NpcFactionBridge.hasConfiguredFaction(npc)
+                        && !NpcFactionBridge.shouldActivelyTarget(npc, newTarget)) {
+                    event.setNewAboutToBeSetTarget(null);
                 }
             }
         }

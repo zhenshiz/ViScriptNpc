@@ -15,5 +15,6 @@ public class RenderRegister {
     @SubscribeEvent
     public static void registerEntityRender(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(NpcRegister.CUSTOM_NPC.get(), (context) -> new CustomNpcRender<>(context, new PlayerModel<>(context.bakeLayer(ModelLayers.PLAYER), true)));
+        event.registerEntityRenderer(NpcRegister.CUSTOM_NPC_PROJECTILE.get(), NpcProjectileRenderer::new);
     }
 }

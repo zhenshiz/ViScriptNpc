@@ -2,9 +2,9 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'idea'
-    id 'net.neoforged.moddev' version '2.0.82'
-    id 'io.freefair.lombok' version '8.6'
-    id("dev.vfyjxf.modaccessor") version "1.1"
+    id 'net.neoforged.moddev' version '2.0.141'
+    id 'io.freefair.lombok' version '9.5.0'
+    id("dev.vfyjxf.modaccessor") version "1.2.1"
 }
 
 version = mod_version
@@ -13,6 +13,8 @@ group = mod_group_id
 def customNpcsJar = files("libs/CustomNPCs-Unofficial-NeoForge-1.21.1.20241226.jar")
 
 repositories {
+    mavenLocal()
+
     //kubejs
     maven {
         name = "Latvian"
@@ -73,10 +75,26 @@ repositories {
         name = "magicTeam MavenSnapshots"
         url = "https://maven.confluence.ink/snapshots"
     }
+    exclusiveContent {
+        forRepositories(
+                mavenLocal(),
+                maven {
+                    name = "attentionMindMavenReleases"
+                    url = "https://maven.confluence.ink/releases"
+                },
+                maven {
+                    name = "attentionMindMavenSnapshots"
+                    url = "https://maven.confluence.ink/snapshots"
+                }
+        )
+        filter {
+            includeGroup "org.thexeler"
+        }
+    }
 }
 
 base {
-    archivesName = mod_id
+    archivesName = "${mod_name}-neoforge-${minecraft_version}"
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
@@ -161,7 +179,7 @@ dependencies {
     jarJar("com.zhenshiz:ViScriptLib-neoforge-${minecraft_version}:${viscriptlib_version}") {
         changing = true
     }
-
+    implementation("com.zhenshiz:ViScriptTeam-neoforge-${minecraft_version}:${viscriptteam_version}")
     implementation "org.thexeler:attention-mind:${attention_mind_version}"
     jarJar "org.thexeler:attention-mind:${attention_mind_version}"
 
@@ -201,7 +219,8 @@ tasks.withType(ProcessResources).configureEach {
                              mod_version            : mod_version,
                              mod_authors            : mod_authors,
                              mod_description        : mod_description,
-                             ldlib2_version         : ldlib2_version]
+                             ldlib2_version         : ldlib2_version,
+                             viscriptteam_version   : viscriptteam_version]
     inputs.properties replaceProperties
 
     filesMatching(['META-INF/neoforge.mods.toml']) {
@@ -211,13 +230,57 @@ tasks.withType(ProcessResources).configureEach {
 
 publishing {
     publications {
-        register('mavenJava', MavenPublication) {
+        mavenJava(MavenPublication) {
             from components.java
+
+            groupId = project.group
+            artifactId = base.archivesName.get()
+            version = project.version
+
+            pom.withXml {
+                def dependenciesNode = asNode().getAt("dependencies")[0]
+                if (dependenciesNode != null) {
+                    // 这里添加你希望保留在 POM 中的 groupId 或 artifactId，也就是从 Maven 拉依赖时会附带的库、模组啥的
+                    def whiteList = [
+                    ]
+
+                    def dependencies = dependenciesNode.children()
+                    def toRemove = []
+
+                    dependencies.each { dep ->
+                        def artifactId = dep.artifactId.text()
+                        def groupId = dep.groupId.text()
+
+                        if (!whiteList.contains(artifactId) && !whiteList.contains(groupId)) {
+                            toRemove.add(dep)
+                        }
+                    }
+
+                    toRemove.each { dependenciesNode.remove(it) }
+                }
+            }
         }
     }
+
     repositories {
+        def modVersion = project.findProperty('mod_version') ?: 'unknown'
+
+        boolean isSnapshot = modVersion.toLowerCase().contains('snapshot')
+
+        def publishUrl = isSnapshot ?
+                "https://maven.sighs.cc/repository/maven-snapshots/" :
+                "https://maven.sighs.cc/repository/maven-releases/"
+
+        def publishUser = System.getenv("SIGHS_PUBLISH_USER")
+        def publishPassword = System.getenv("SIGHS_PUBLISH_PASSWORD")
+
         maven {
-            url "file://${project.projectDir}/repo"
+            name = "remoteRepo"
+            url = uri(publishUrl)
+            credentials {
+                username = publishUser
+                password = publishPassword
+            }
         }
     }
 }

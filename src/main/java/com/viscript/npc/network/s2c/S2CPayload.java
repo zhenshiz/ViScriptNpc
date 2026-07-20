@@ -11,7 +11,8 @@ import java.util.Set;
 public class S2CPayload {
     public static final String OPEN_NPC_EDITOR = "openNpcEditor";
     public static final String SEND_LOOT_TABLES = "sendLootTables";
-    public static final String SEND_NPC_AI_DEBUG_SNAPSHOT = "sendNpcAiDebugSnapshot";
+    public static final String SEND_FACTION_IDS = "sendFactionIds";
+    public static final String SEND_NPC_AI_WORLD_TEST_PATH = "sendNpcAiWorldTestPath";
 
     @RPCPacket(OPEN_NPC_EDITOR)
     public static void openNpcEditor(RPCSender sender, CompoundTag tag) {
@@ -23,10 +24,13 @@ public class S2CPayload {
         if (sender.isServer()) CustomNpc.lootTableKeys = keys;
     }
 
-    @RPCPacket(SEND_NPC_AI_DEBUG_SNAPSHOT)
-    public static void sendNpcAiDebugSnapshot(RPCSender sender, CompoundTag payload) {
-        if (sender.isServer()) {
-            ViScriptNpcClientUtil.setNpcAiDebugSnapshot(payload);
-        }
+    @RPCPacket(SEND_FACTION_IDS)
+    public static void setSendFactionIds(RPCSender sender, Set<String> ids) {
+        if (sender.isServer()) CustomNpc.factionIds = ids == null ? Set.of() : ids;
+    }
+
+    @RPCPacket(SEND_NPC_AI_WORLD_TEST_PATH)
+    public static void sendNpcAiWorldTestPath(RPCSender sender, CompoundTag tag) {
+        if (sender.isServer()) ViScriptNpcClientUtil.receiveNpcAiWorldPath(tag);
     }
 }

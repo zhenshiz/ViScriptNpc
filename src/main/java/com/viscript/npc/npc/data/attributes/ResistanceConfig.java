@@ -19,4 +19,7 @@ public class ResistanceConfig implements INpcData {
     @Configurable(name = "npcConfig.npcAttributes.resistanceConfig.melee")
     @ConfigNumber(range = {0, 1}, wheel = 0.01)
     private float melee = 0;
+    @Configurable(name = "npcConfig.npcAttributes.resistanceConfig.fire")
+    @ConfigNumber(range = {0, 1}, wheel = 0.01)
+    private float fire = 0;
 }

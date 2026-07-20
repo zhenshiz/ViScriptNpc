@@ -20,12 +20,20 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
@@ -33,15 +41,15 @@ import org.joml.AxisAngle4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
+import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 public class ViScriptNpcClientUtil {
-    private static final double NPC_AI_DEBUG_TARGET_RADIUS = 64.0D;
+    private static final double NPC_AI_WORLD_TEST_TARGET_RADIUS = 64.0D;
     private static final double NPC_AI_WORLD_CAMERA_DRAG_SCALE = 1.0D / 0.15D;
     public static NPCProject cacheNpcProject;
-    private static final Map<Integer, CompoundTag> NPC_AI_DEBUG_SNAPSHOTS = new HashMap<>();
+    private static int npcAiWorldTestActiveEntityId = -1;
     private static boolean npcAiWorldInteractionMode;
     private static int npcAiWorldTestEntityId = -1;
     private static float npcAiWorldCameraDistance = 12.0F;
@@ -55,6 +63,15 @@ public class ViScriptNpcClientUtil {
     private static double npcEditorMouseY;
     @Nullable
     private static BlockHitResult npcAiWorldBlockHit;
+    private static int npcAiWorldDraggedMobId = -1;
+    @Nullable
+    private static Vec3 npcAiWorldDraggedMobTarget;
+    @Nullable
+    private static Vec3 npcAiWorldLastSentMobDragTarget;
+    private static int npcAiWorldPathEntityId = -1;
+    private static long npcAiWorldPathExpireTick;
+    private static List<Vec3> npcAiWorldPathPoints = List.of();
+    private static boolean npcAiWorldPathVisible = true;
 
     @Info("客户端打开NPC编辑器")
     public static void openNpcEditor(@Nullable CompoundTag tag) {
@@ -64,15 +81,20 @@ public class ViScriptNpcClientUtil {
         Editor editor = editorWindow.getCurrentEditor();
         if (editor == null) return;
         if (tag != null && !tag.isEmpty()) {
+            if (!isProjectFileTag(tag)) {
+                showEditorOpenFailure(Component.translatable("viscript_npc.editor.open_project.invalid_file"));
+                return;
+            }
             var project = (NPCProject) NPCProject.PROVIDER.projectCreator.get();
             project.initNewProject();
             try {
-                if (isProjectFileTag(tag)) {
-                    project.deserializeNBT(Platform.getFrozenRegistry(), tag);
-                    editor.loadProject(project, null);
-                    return;
-                }
-            } catch (Exception ignored) {
+                project.deserializeNBT(Platform.getFrozenRegistry(), tag);
+                editor.loadProject(project, null);
+                return;
+            } catch (Exception exception) {
+                showEditorOpenFailure(Component.translatable("viscript_npc.editor.open_project.failed",
+                        exception.getClass().getSimpleName()));
+                return;
             }
         }
         if (cacheNpcProject != null) {
@@ -85,24 +107,19 @@ public class ViScriptNpcClientUtil {
                 && tag.getCompound("data").contains("npc", Tag.TAG_COMPOUND);
     }
 
-    public static void setNpcAiDebugSnapshot(CompoundTag payload) {
-        if (payload == null || !payload.contains("entityId")) {
-            return;
+    private static void showEditorOpenFailure(Component message) {
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player != null) {
+            player.displayClientMessage(message, false);
         }
-        NPC_AI_DEBUG_SNAPSHOTS.put(payload.getInt("entityId"), payload.copy());
     }
 
-    public static CompoundTag getNpcAiDebugSnapshot(int entityId) {
-        CompoundTag payload = NPC_AI_DEBUG_SNAPSHOTS.get(entityId);
-        return payload == null ? new CompoundTag() : payload.copy();
-    }
-
-    public static int findNearestNpcAiDebugTarget(@Nullable String npcType) {
-        CustomNpc npc = findNearestNpcAiDebugTargetEntity(npcType);
+    public static int findNearestNpcAiWorldTestTarget(@Nullable String npcType) {
+        CustomNpc npc = findNearestNpcAiWorldTestTargetEntity(npcType);
         return npc == null ? -1 : npc.getId();
     }
 
-    public static String getClientNpcDebugName(int entityId) {
+    public static String getClientNpcWorldTestName(int entityId) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || !(minecraft.level.getEntity(entityId) instanceof CustomNpc npc)) {
             return "";
@@ -112,10 +129,13 @@ public class ViScriptNpcClientUtil {
 
     public static void enterNpcAiWorldTestMode(int targetEntityId) {
         Minecraft minecraft = Minecraft.getInstance();
+        if (targetEntityId < 0) {
+            targetEntityId = resolveNpcAiWorldTestEntityId();
+        }
+        npcAiWorldTestActiveEntityId = targetEntityId;
         boolean targetChanged = npcAiWorldTestEntityId != targetEntityId;
         boolean wasActive = isNpcAiWorldInteractionMode();
         if (npcAiWorldTestEntityId != targetEntityId) {
-            syncNpcAiWorldIgnoredPlayer(false);
             npcAiWorldTestEntityId = targetEntityId;
             clearNpcAiWorldFixedCamera();
         }
@@ -128,13 +148,14 @@ public class ViScriptNpcClientUtil {
             }
         }
         setNpcAiWorldInteractionMode(true);
-        if (targetChanged && wasActive && isNpcAiWorldInteractionMode()) {
-            syncNpcAiWorldIgnoredPlayer(true);
-        }
     }
 
     public static void toggleNpcAiWorldInteractionMode() {
-        setNpcAiWorldInteractionMode(!isNpcAiWorldInteractionMode());
+        if (isNpcAiWorldInteractionMode()) {
+            setNpcAiWorldInteractionMode(false);
+        } else {
+            enterNpcAiWorldTestMode(resolveNpcAiWorldTestEntityId());
+        }
     }
 
     public static void setNpcAiWorldInteractionMode(boolean enabled) {
@@ -143,11 +164,15 @@ public class ViScriptNpcClientUtil {
         if (npcAiWorldInteractionMode == active) {
             return;
         }
+        if (active) {
+            ensureNpcAiWorldTestEntityId();
+        }
         npcAiWorldInteractionMode = active;
-        syncNpcAiWorldIgnoredPlayer(active);
         if (!active) {
             KeyMapping.releaseAll();
             npcAiWorldBlockHit = null;
+            clearNpcAiWorldPath();
+            stopNpcAiWorldMobDrag();
             restoreEditorAfterWorldTest();
         }
     }
@@ -164,6 +189,8 @@ public class ViScriptNpcClientUtil {
         setNpcAiWorldInteractionMode(false);
         npcAiWorldTestEntityId = -1;
         npcAiWorldBlockHit = null;
+        clearNpcAiWorldPath();
+        stopNpcAiWorldMobDrag();
         clearNpcAiWorldFixedCamera();
     }
 
@@ -181,6 +208,62 @@ public class ViScriptNpcClientUtil {
         npcEditorMouseX = mouseX;
         npcEditorMouseY = mouseY;
         updateNpcAiWorldBlockHit();
+    }
+
+    public static void requestNpcAiWorldPath() {
+        if (!isNpcAiWorldInteractionMode() || !npcAiWorldPathVisible) {
+            clearNpcAiWorldPath();
+            return;
+        }
+        int entityId = ensureNpcAiWorldTestEntityId();
+        if (entityId < 0) {
+            clearNpcAiWorldPath();
+            return;
+        }
+        RPCPacketDistributor.rpcToServer(C2SPayload.REQUEST_NPC_AI_WORLD_TEST_PATH, entityId);
+    }
+
+    public static void receiveNpcAiWorldPath(CompoundTag tag) {
+        int entityId = tag.getInt("entityId");
+        if (entityId != npcAiWorldTestEntityId) {
+            return;
+        }
+        ListTag pointsTag = tag.getList("points", Tag.TAG_COMPOUND);
+        List<Vec3> points = new ArrayList<>(pointsTag.size());
+        for (Tag pointTag : pointsTag) {
+            if (pointTag instanceof CompoundTag point) {
+                points.add(new Vec3(point.getDouble("x"), point.getDouble("y"), point.getDouble("z")));
+            }
+        }
+        npcAiWorldPathEntityId = entityId;
+        npcAiWorldPathPoints = points;
+        Minecraft minecraft = Minecraft.getInstance();
+        npcAiWorldPathExpireTick = minecraft.level == null ? 0L : minecraft.level.getGameTime() + 10L;
+    }
+
+    public static List<Vec3> getNpcAiWorldPathPoints() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!isNpcAiWorldInteractionMode()
+                || !npcAiWorldPathVisible
+                || npcAiWorldPathEntityId != npcAiWorldTestEntityId
+                || minecraft.level == null
+                || minecraft.level.getGameTime() > npcAiWorldPathExpireTick) {
+            return List.of();
+        }
+        return npcAiWorldPathPoints;
+    }
+
+    public static void toggleNpcAiWorldPathVisible() {
+        npcAiWorldPathVisible = !npcAiWorldPathVisible;
+        if (!npcAiWorldPathVisible) {
+            clearNpcAiWorldPath();
+        }
+        LocalPlayer player = Minecraft.getInstance().player;
+        if (player != null) {
+            player.displayClientMessage(Component.translatable(npcAiWorldPathVisible
+                    ? "viscript_npc.editor.world_test.path.enabled"
+                    : "viscript_npc.editor.world_test.path.disabled"), true);
+        }
     }
 
     public static boolean shouldForwardNpcAiWorldInput(@Nullable Screen screen, double mouseX, double mouseY) {
@@ -273,12 +356,13 @@ public class ViScriptNpcClientUtil {
 
     public static boolean breakNpcAiWorldTargetBlock() {
         BlockHitResult hit = getNpcAiWorldBlockHit();
-        if (hit == null || npcAiWorldTestEntityId < 0) {
+        int targetEntityId = ensureNpcAiWorldTestEntityId();
+        if (hit == null || targetEntityId < 0) {
             return false;
         }
         BlockPos pos = hit.getBlockPos();
         Vec3 location = hit.getLocation();
-        RPCPacketDistributor.rpcToServer(C2SPayload.BREAK_NPC_AI_DEBUG_WORLD_BLOCK, npcAiWorldTestEntityId,
+        RPCPacketDistributor.rpcToServer(C2SPayload.BREAK_NPC_AI_WORLD_TEST_BLOCK, targetEntityId,
                 pos.getX(), pos.getY(), pos.getZ(), hit.getDirection().ordinal(),
                 location.x(), location.y(), location.z());
         return true;
@@ -286,15 +370,82 @@ public class ViScriptNpcClientUtil {
 
     public static boolean useNpcAiWorldTargetBlock() {
         BlockHitResult hit = getNpcAiWorldBlockHit();
-        if (hit == null || npcAiWorldTestEntityId < 0) {
+        int targetEntityId = ensureNpcAiWorldTestEntityId();
+        if (hit == null || targetEntityId < 0) {
             return false;
         }
         BlockPos pos = hit.getBlockPos();
         Vec3 location = hit.getLocation();
-        RPCPacketDistributor.rpcToServer(C2SPayload.USE_NPC_AI_DEBUG_WORLD_BLOCK, npcAiWorldTestEntityId,
+        RPCPacketDistributor.rpcToServer(C2SPayload.USE_NPC_AI_WORLD_TEST_BLOCK, targetEntityId,
                 pos.getX(), pos.getY(), pos.getZ(), hit.getDirection().ordinal(),
                 location.x(), location.y(), location.z());
         return true;
+    }
+
+    public static boolean tryStartNpcAiWorldMobDrag() {
+        if (!canDragNpcAiWorldMob()) {
+            return false;
+        }
+        EntityHitResult hit = getNpcAiWorldMobHit();
+        if (hit == null || !(hit.getEntity() instanceof Mob)) {
+            return false;
+        }
+        npcAiWorldDraggedMobId = hit.getEntity().getId();
+        npcAiWorldDraggedMobTarget = null;
+        npcAiWorldLastSentMobDragTarget = null;
+        return true;
+    }
+
+    public static boolean updateNpcAiWorldMobDrag() {
+        if (!isNpcAiWorldMobDragging()) {
+            return false;
+        }
+        Vec3 target = getNpcAiWorldMobDragTarget();
+        if (target == null) {
+            return false;
+        }
+        npcAiWorldDraggedMobTarget = target;
+        if (npcAiWorldLastSentMobDragTarget != null
+                && npcAiWorldLastSentMobDragTarget.distanceToSqr(target) < 0.01D) {
+            return true;
+        }
+        int targetEntityId = ensureNpcAiWorldTestEntityId();
+        if (targetEntityId < 0) {
+            stopNpcAiWorldMobDrag();
+            return false;
+        }
+        npcAiWorldLastSentMobDragTarget = target;
+        RPCPacketDistributor.rpcToServer(C2SPayload.MOVE_NPC_AI_WORLD_TEST_MOB,
+                targetEntityId, npcAiWorldDraggedMobId, target.x(), target.y(), target.z());
+        return true;
+    }
+
+    public static void stopNpcAiWorldMobDrag() {
+        npcAiWorldDraggedMobId = -1;
+        npcAiWorldDraggedMobTarget = null;
+        npcAiWorldLastSentMobDragTarget = null;
+    }
+
+    public static boolean isNpcAiWorldMobDragging() {
+        return npcAiWorldDraggedMobId >= 0 && isNpcAiWorldInteractionMode();
+    }
+
+    @Nullable
+    public static AABB getNpcAiWorldMobHighlightBox() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!isNpcAiWorldInteractionMode() || minecraft.level == null) {
+            return null;
+        }
+        Entity entity = null;
+        if (isNpcAiWorldMobDragging()) {
+            entity = minecraft.level.getEntity(npcAiWorldDraggedMobId);
+        } else {
+            EntityHitResult hit = getNpcAiWorldMobHit();
+            if (hit != null) {
+                entity = hit.getEntity();
+            }
+        }
+        return entity instanceof Mob ? entity.getBoundingBox().inflate(0.08D) : null;
     }
 
     @Nullable
@@ -338,13 +489,77 @@ public class ViScriptNpcClientUtil {
 
     private static void updateNpcAiWorldBlockHit() {
         Minecraft minecraft = Minecraft.getInstance();
+        WorldRay ray = getNpcAiWorldMouseRay();
+        if (ray == null || minecraft.level == null || minecraft.player == null) {
+            npcAiWorldBlockHit = null;
+            return;
+        }
+        HitResult hit = minecraft.level.clip(new ClipContext(ray.start(), ray.end(), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, minecraft.player));
+        npcAiWorldBlockHit = hit instanceof BlockHitResult blockHit && blockHit.getType() == HitResult.Type.BLOCK ? blockHit : null;
+    }
+
+    @Nullable
+    private static EntityHitResult getNpcAiWorldMobHit() {
+        Minecraft minecraft = Minecraft.getInstance();
+        WorldRay ray = getNpcAiWorldMouseRay();
+        if (ray == null || minecraft.level == null || minecraft.player == null || !canDragNpcAiWorldMob()) {
+            return null;
+        }
+        Vec3 end = ray.end();
+        AABB searchBox = new AABB(ray.start(), end).inflate(1.0D);
+        EntityHitResult entityHit = ProjectileUtil.getEntityHitResult(minecraft.level, minecraft.player,
+                ray.start(), end, searchBox, entity -> entity instanceof Mob && entity.isAlive() && entity.isPickable(), 0.3F);
+        if (entityHit == null) {
+            return null;
+        }
+        BlockHitResult blockHit = getNpcAiWorldBlockHit();
+        if (blockHit != null
+                && blockHit.getLocation().distanceToSqr(ray.start()) + 0.01D < entityHit.getLocation().distanceToSqr(ray.start())) {
+            return null;
+        }
+        return entityHit;
+    }
+
+    @Nullable
+    private static Vec3 getNpcAiWorldMobDragTarget() {
+        BlockHitResult hit = getNpcAiWorldBlockHit();
+        if (hit == null) {
+            return null;
+        }
+        Vec3 location = hit.getLocation();
+        double y = mobDragFeetY(hit);
+        return new Vec3(location.x(), y, location.z());
+    }
+
+    private static double mobDragFeetY(BlockHitResult hit) {
+        Direction direction = hit.getDirection();
+        BlockPos blockPos = hit.getBlockPos();
+        if (direction == Direction.UP) {
+            return blockPos.getY() + 1.0D;
+        }
+        if (direction == Direction.DOWN) {
+            return blockPos.getY() - 0.05D;
+        }
+        return Math.floor(hit.getLocation().y());
+    }
+
+    private static boolean canDragNpcAiWorldMob() {
+        Minecraft minecraft = Minecraft.getInstance();
+        return isNpcAiWorldInteractionMode()
+                && ensureNpcAiWorldTestEntityId() >= 0
+                && minecraft.player != null
+                && minecraft.player.getMainHandItem().isEmpty();
+    }
+
+    @Nullable
+    private static WorldRay getNpcAiWorldMouseRay() {
+        Minecraft minecraft = Minecraft.getInstance();
         if (!isNpcAiWorldInteractionMode()
                 || minecraft.level == null
                 || minecraft.player == null
                 || !npcEditorMouseKnown
                 || isMouseOverNpcEditorWindow(npcEditorMouseX, npcEditorMouseY)) {
-            npcAiWorldBlockHit = null;
-            return;
+            return null;
         }
         Vec3 start;
         Vec3 direction;
@@ -354,16 +569,13 @@ public class ViScriptNpcClientUtil {
         } else {
             Camera camera = minecraft.gameRenderer.getMainCamera();
             if (!camera.isInitialized()) {
-                npcAiWorldBlockHit = null;
-                return;
+                return null;
             }
             start = camera.getPosition();
             direction = camera.getNearPlane().getPointOnPlane(mouseLeftScale(), mouseUpScale()).normalize();
         }
         double reach = Math.max(64.0D, npcAiWorldCameraDistance + minecraft.player.blockInteractionRange());
-        Vec3 end = start.add(direction.scale(reach));
-        HitResult hit = minecraft.level.clip(new ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, minecraft.player));
-        npcAiWorldBlockHit = hit instanceof BlockHitResult blockHit && blockHit.getType() == HitResult.Type.BLOCK ? blockHit : null;
+        return new WorldRay(start, direction, reach);
     }
 
     private static boolean ensureNpcAiWorldFixedCamera() {
@@ -432,13 +644,6 @@ public class ViScriptNpcClientUtil {
         return (float) (1.0D - pixelY / window.getHeight() * 2.0D);
     }
 
-    private static void syncNpcAiWorldIgnoredPlayer(boolean ignored) {
-        if (npcAiWorldTestEntityId < 0) {
-            return;
-        }
-        RPCPacketDistributor.rpcToServer(C2SPayload.SET_NPC_AI_DEBUG_IGNORED_PLAYER, npcAiWorldTestEntityId, ignored);
-    }
-
     @Nullable
     private static EditorWindow getCurrentEditorWindow() {
         return getEditorWindow(Minecraft.getInstance().screen);
@@ -483,8 +688,45 @@ public class ViScriptNpcClientUtil {
         }
     }
 
+    private static int ensureNpcAiWorldTestEntityId() {
+        if (isClientCustomNpc(npcAiWorldTestEntityId)) {
+            return npcAiWorldTestEntityId;
+        }
+        npcAiWorldTestEntityId = -1;
+        int targetEntityId = resolveNpcAiWorldTestEntityId();
+        if (targetEntityId >= 0) {
+            npcAiWorldTestEntityId = targetEntityId;
+            npcAiWorldTestActiveEntityId = targetEntityId;
+        }
+        return npcAiWorldTestEntityId;
+    }
+
+    private static int resolveNpcAiWorldTestEntityId() {
+        if (isClientCustomNpc(npcAiWorldTestActiveEntityId)) {
+            return npcAiWorldTestActiveEntityId;
+        }
+        NPCProject project = getCurrentNpcProject();
+        return project == null ? -1 : findNearestNpcAiWorldTestTarget(project.getCurrentNpcType());
+    }
+
+    private static boolean isClientCustomNpc(int entityId) {
+        Minecraft minecraft = Minecraft.getInstance();
+        return entityId >= 0
+                && minecraft.level != null
+                && minecraft.level.getEntity(entityId) instanceof CustomNpc;
+    }
+
     @Nullable
-    private static CustomNpc findNearestNpcAiDebugTargetEntity(@Nullable String npcType) {
+    private static NPCProject getCurrentNpcProject() {
+        EditorWindow editorWindow = getCurrentEditorWindow();
+        if (editorWindow == null || !(editorWindow.getCurrentEditor() instanceof NpcEditor npcEditor)) {
+            return null;
+        }
+        return npcEditor.getCurrentProject() instanceof NPCProject project ? project : null;
+    }
+
+    @Nullable
+    private static CustomNpc findNearestNpcAiWorldTestTargetEntity(@Nullable String npcType) {
         Minecraft minecraft = Minecraft.getInstance();
         LocalPlayer player = minecraft.player;
         if (player == null || minecraft.level == null) {
@@ -492,10 +734,22 @@ public class ViScriptNpcClientUtil {
         }
         String targetType = npcType == null ? "" : npcType.trim();
         return minecraft.level.getEntitiesOfClass(CustomNpc.class,
-                        player.getBoundingBox().inflate(NPC_AI_DEBUG_TARGET_RADIUS))
+                        player.getBoundingBox().inflate(NPC_AI_WORLD_TEST_TARGET_RADIUS))
                 .stream()
                 .filter(npc -> targetType.isEmpty() || targetType.equals(npc.getNpcType()))
                 .min(Comparator.comparingDouble(player::distanceToSqr))
                 .orElse(null);
+    }
+
+    private static void clearNpcAiWorldPath() {
+        npcAiWorldPathEntityId = -1;
+        npcAiWorldPathExpireTick = 0L;
+        npcAiWorldPathPoints = List.of();
+    }
+
+    private record WorldRay(Vec3 start, Vec3 direction, double reach) {
+        private Vec3 end() {
+            return start.add(direction.scale(reach));
+        }
     }
 }

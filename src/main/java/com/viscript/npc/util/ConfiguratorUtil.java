@@ -15,6 +15,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 
 import javax.annotation.Nonnull;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -64,14 +65,20 @@ public class ConfiguratorUtil {
     }
 
     public static SearchComponentConfigurator<String> createStrArrSearchComponentConfigurator(String name, Set<String> strArr, Supplier<String> getter, Consumer<String> setter) {
+        return createStrArrSearchComponentConfigurator(name, () -> strArr, getter, setter);
+    }
+
+    public static SearchComponentConfigurator<String> createStrArrSearchComponentConfigurator(String name, Supplier<Set<String>> strArr, Supplier<String> getter, Consumer<String> setter) {
         return new SearchComponentConfigurator<>(name,
                 getter,
                 setter,
                 BeanUtil.getValueOrDefault(getter.get(), ""),
                 false,
                 (word, searchHandler) -> {
-                    String lowerWord = word.toLowerCase();
-                    for (var key : strArr) {
+                    String lowerWord = word == null ? "" : word.toLowerCase();
+                    Set<String> values = strArr.get();
+                    if (values == null) return;
+                    for (var key : values.stream().filter(Objects::nonNull).sorted().toList()) {
                         if (Thread.currentThread().isInterrupted()) return;
                         if (key.toLowerCase().contains(lowerWord)) {
                             ((IResultHandler<String>) searchHandler).acceptResult(key);

@@ -61,16 +61,18 @@ public class NpcAttributesComparisonView extends View implements INpcEditorSlotV
         addGroup("viscript_npc.editor.attributes.group.core", List.of(
                 row("npcConfig.npcAttributes.maxHealth", current, NpcAttributes::getMaxHealth),
                 row("npcConfig.npcAttributes.movementSpeed", current, NpcAttributes::getMovementSpeed),
-                row("npcConfig.npcAttributes.followRange", current, NpcAttributes::getFollowRange),
                 row("npcConfig.npcAttributes.combatRegenRate", current, attributes -> attributes.getCombatRegenRate()),
                 row("npcConfig.npcAttributes.outOfCombatRegenRate", current, attributes -> attributes.getOutOfCombatRegenRate())
         ));
 
         addGroup("viscript_npc.editor.attributes.group.offense", List.of(
                 row("npcConfig.npcAttributes.meleeConfig.attackDamage", current, attributes -> attributes.getMeleeConfig().getAttackDamage()),
-                row("npcConfig.npcAttributes.meleeConfig.attackSpeed", current, attributes -> attributes.getMeleeConfig().getAttackSpeed()),
                 row("npcConfig.npcAttributes.meleeConfig.attackRange", current, attributes -> attributes.getMeleeConfig().getAttackRange()),
-                row("npcConfig.npcAttributes.meleeConfig.knockback", current, attributes -> attributes.getMeleeConfig().getKnockback())
+                row("npcConfig.npcAttributes.meleeConfig.knockback", current, attributes -> attributes.getMeleeConfig().getKnockback()),
+                row("npcConfig.npcAttributes.rangedConfig.damage", current, attributes -> attributes.getRangedConfig().getDamage()),
+                row("npcConfig.npcAttributes.rangedConfig.knockback", current, attributes -> attributes.getRangedConfig().getKnockback()),
+                row("npcConfig.npcAttributes.rangedConfig.speed", current, attributes -> attributes.getRangedConfig().getSpeed()),
+                row("npcConfig.npcAttributes.rangedConfig.explosionPower", current, attributes -> attributes.getRangedConfig().getExplosionPower())
         ));
 
         addGroup("viscript_npc.editor.attributes.group.defense", List.of(
@@ -80,11 +82,11 @@ public class NpcAttributesComparisonView extends View implements INpcEditorSlotV
                 row("npcConfig.npcAttributes.resistanceConfig.knockback", current, attributes -> attributes.getResistanceConfig().getKnockback()),
                 row("npcConfig.npcAttributes.resistanceConfig.projectile", current, attributes -> attributes.getResistanceConfig().getProjectile()),
                 row("npcConfig.npcAttributes.resistanceConfig.explosion", current, attributes -> attributes.getResistanceConfig().getExplosion()),
-                row("npcConfig.npcAttributes.resistanceConfig.melee", current, attributes -> attributes.getResistanceConfig().getMelee())
+                row("npcConfig.npcAttributes.resistanceConfig.melee", current, attributes -> attributes.getResistanceConfig().getMelee()),
+                row("npcConfig.npcAttributes.resistanceConfig.fire", current, attributes -> attributes.getResistanceConfig().getFire())
         ));
 
         addGroup("viscript_npc.editor.attributes.group.flags", List.of(
-                booleanRow("npcConfig.npcAttributes.isImmuneToFire", current, NpcAttributes::isImmuneToFire),
                 booleanRow("npcConfig.npcAttributes.isCanDrown", current, NpcAttributes::isCanDrown),
                 booleanRow("npcConfig.npcAttributes.isPotionImmune", current, NpcAttributes::isPotionImmune),
                 booleanRow("npcConfig.npcAttributes.isFallDamage", current, NpcAttributes::isFallDamage),

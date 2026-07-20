@@ -6,48 +6,40 @@ import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.lowdragmc.lowdraglib2.syncdata.annotation.Persisted;
 import com.viscript.npc.gui.edit.page.NpcEditorPageIds;
 import com.viscript.npc.npc.data.INpcData;
-import com.viscript.npc.npc.data.ai.graph.NpcBehaviorGraph;
-import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorProgramCompiler;
 import lombok.Data;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import org.thexeler.api.MindMachineConfig;
+import org.thexeler.api.navigation.NavigationRegistry;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @LDLRegister(name = "npc_ai", registry = INpcData.ID)
 public class NpcAI implements INpcData {
     @Configurable(name = "npcConfig.npcAI.enabled")
-    private boolean enabled = false;
-    @Configurable(name = "npcConfig.npcAI.tickRate")
-    @ConfigNumber(range = {1, 200}, type = ConfigNumber.Type.INTEGER)
-    private int tickRate = 5;
     @Persisted
-    private CompoundTag behaviorGraph = NpcBehaviorGraph.createDefaultGraphTag();
+    private boolean enabled = true;
+
+    @Configurable(name = "npcConfig.npcAI.tickRate", tips = "npcConfig.npcAI.tickRate.tips")
+    @ConfigNumber(range = {1, 100}, type = ConfigNumber.Type.INTEGER)
     @Persisted
-    private CompoundTag behaviorProgram = new CompoundTag();
+    private int tickRate = 8;
+
+    @Configurable(name = "npcConfig.npcAI.navigation")
+    @Persisted
+    private ResourceLocation navigation = NavigationRegistry.defaultStrategy().getId();
+
+    @Configurable(name = "npcConfig.npcAI.intentions", subConfigurable = true)
+    @Persisted
+    private List<IntentionEntry> intentions = new ArrayList<>();
 
     @Override
     public ResourceLocation getEditorPage() {
         return NpcEditorPageIds.AI;
     }
 
-    public CompoundTag getBehaviorGraph() {
-        return behaviorGraph == null ? new CompoundTag() : behaviorGraph.copy();
-    }
-
-    public void setBehaviorGraph(CompoundTag behaviorGraph) {
-        this.behaviorGraph = behaviorGraph == null ? new CompoundTag() : behaviorGraph.copy();
-    }
-
-    public CompoundTag getBehaviorProgram() {
-        return behaviorProgram == null ? new CompoundTag() : behaviorProgram.copy();
-    }
-
-    public void setBehaviorProgram(CompoundTag behaviorProgram) {
-        this.behaviorProgram = behaviorProgram == null ? new CompoundTag() : behaviorProgram.copy();
-    }
-
-    public CompoundTag compileBehaviorProgram(HolderLookup.Provider provider) {
-        return NpcBehaviorProgramCompiler.compileToTag(getBehaviorGraph(), provider);
+    public MindMachineConfig toConfig() {
+        return new MindMachineConfig(tickRate, navigation);
     }
 }

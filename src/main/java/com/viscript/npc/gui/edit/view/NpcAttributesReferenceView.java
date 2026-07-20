@@ -168,7 +168,8 @@ public class NpcAttributesReferenceView extends View implements INpcEditorSlotVi
             addChild(createWrappedLabel(Component.literal(npc.getNpcType()), 10));
             addChild(createWrappedLabel(Component.translatable("viscript_npc.editor.attributes.reference_health_line",
                     formatNumber(npc.getNpcAttributes().getMaxHealth()),
-                    formatNumber(npc.getNpcAttributes().getMeleeConfig().getAttackDamage())), 8));
+                    formatNumber(npc.getNpcAttributes().getMeleeConfig().getAttackDamage()),
+                    formatNumber(npc.getNpcAttributes().getRangedConfig().getDamage())), 8));
 
             addEventListener(UIEvents.MOUSE_DOWN, event -> {
                 if (event.button == 0) {

@@ -2,6 +2,7 @@ package com.viscript.npc.gui.edit;
 
 import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.editor.project.IProject;
+import com.lowdragmc.lowdraglib2.editor.ui.EditorWindow;
 import com.lowdragmc.lowdraglib2.editor.ui.View;
 import com.lowdragmc.lowdraglib2.editor.ui.ViewContainer;
 import com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture;
@@ -18,6 +19,7 @@ import com.viscript.npc.gui.edit.view.NpcEditorContentView;
 import com.viscript.npc.gui.edit.view.NpcInspectorView;
 import com.viscript.npc.gui.edit.view.NpcListView;
 import com.viscript.npc.gui.edit.page.INpcEditorPage;
+import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
 import com.viscript.npc.util.ViScriptNpcClientUtil;
 import com.viscript_lib.gui.editor.EditorFileFormat;
 import com.viscript_lib.gui.editor.EditorFileNames;
@@ -26,6 +28,7 @@ import com.viscript_lib.gui.editor.EditorUploadAction;
 import com.viscript_lib.gui.editor.ProjectFileEditor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
 import dev.vfyjxf.taffy.style.AlignItems;
 import dev.vfyjxf.taffy.style.FlexDirection;
@@ -42,6 +45,9 @@ import java.util.Map;
 public class NpcEditor extends ProjectFileEditor {
     public static final ResourceLocation EDITOR_ID = ViScriptNpc.id("editor");
     public final static SpriteTexture ICON = SpriteTexture.of(ViScriptNpc.formattedMod("textures/icon.png"));
+    private static int NEXT_UNTITLED_PROJECT_INDEX = 1;
+    private static final float PROJECT_TAB_MAX_WIDTH = 220.0f;
+    private static final float PROJECT_TAB_MIN_WIDTH = 90.0f;
 
     public final NpcListView npcListView = new NpcListView(this);
     private final UIElement npcEditorPageBar = new UIElement();
@@ -57,6 +63,10 @@ public class NpcEditor extends ProjectFileEditor {
     private NPCPreviewView npcPreviewView;
     @Nullable
     private INpcEditorPage selectedNpcEditorPage;
+    private int untitledProjectIndex;
+    private int lastProjectTabCount = -1;
+    private float lastProjectTabAvailableWidth = -1.0f;
+    private boolean lastProjectPageBarOffset;
     private boolean npcAiWorldTestCollapsedRightWindow;
     private boolean npcAiWorldTestRightWasCollapsed;
 
@@ -134,9 +144,11 @@ public class NpcEditor extends ProjectFileEditor {
     @Override
     protected void loadNewProject(IProject project, @Nullable File projectFile) {
         if (project instanceof NPCProject npcProject) {
+            untitledProjectIndex = projectFile == null ? NEXT_UNTITLED_PROJECT_INDEX++ : 0;
             super.loadNewProject(project, projectFile);
             ViScriptNpcClientUtil.cacheNpcProject = npcProject;
             loadNpcEditorPages();
+            refreshProjectTabs(true);
         }
     }
 
@@ -145,6 +157,21 @@ public class NpcEditor extends ProjectFileEditor {
         super.closeCurrentProject();
         npcInspectorView.clear();
         clearNpcEditorPages();
+        refreshProjectTabs(true);
+    }
+
+    @Override
+    public Component getTitle() {
+        if (getCurrentProject() instanceof NPCProject project) {
+            return Component.literal(projectTabTitle(project));
+        }
+        return super.getTitle();
+    }
+
+    @Override
+    public void screenTick() {
+        super.screenTick();
+        refreshProjectTabs(false);
     }
 
     public void selectNpcEditorPage(INpcEditorPage page) {
@@ -275,6 +302,85 @@ public class NpcEditor extends ProjectFileEditor {
                 .addClasses("__npc-editor-page-bar__", "__editor_top__");
         npcEditorPageBar.setDisplay(false);
         addChildAt(npcEditorPageBar, 1);
+    }
+
+    private void refreshProjectTabs(boolean force) {
+        EditorWindow window = getWindow();
+        if (window == null) {
+            return;
+        }
+        int count = window.getEditors().size();
+        boolean hasMultipleProjects = count > 1;
+        boolean offsetPageBar = hasMultipleProjects && npcEditorPageBar.isDisplayed();
+        float availableWidth = window.editorButtonContainer.getContentWidth();
+        npcEditorPageBar.layout(layout -> layout.marginTop(offsetPageBar ? 14.0f : 0.0f));
+        mainView.layout(layout -> layout.marginTop(hasMultipleProjects && !offsetPageBar ? 14.0f : 0.0f));
+
+        if (!force && lastProjectTabCount == count && lastProjectPageBarOffset == offsetPageBar
+                && Math.abs(lastProjectTabAvailableWidth - availableWidth) < 1.0f) {
+            return;
+        }
+        lastProjectTabCount = count;
+        lastProjectTabAvailableWidth = availableWidth;
+        lastProjectPageBarOffset = offsetPageBar;
+
+        float tabWidth = projectTabWidth(availableWidth, count);
+        for (UIElement button : window.getEditors().values()) {
+            button.layout(layout -> {
+                layout.heightPercent(100);
+                if (hasMultipleProjects) {
+                    layout.width(tabWidth);
+                    layout.minWidth(PROJECT_TAB_MIN_WIDTH);
+                    layout.maxWidth(tabWidth);
+                    layout.flex(0);
+                    layout.flexGrow(0);
+                    layout.flexShrink(1);
+                    layout.flexBasis(tabWidth);
+                } else {
+                    layout.widthAuto();
+                    layout.minWidthAuto();
+                    layout.maxWidthAuto();
+                    layout.flex(1);
+                    layout.flexBasisAuto();
+                }
+            });
+        }
+    }
+
+    private float projectTabWidth(float availableWidth, int count) {
+        if (count <= 0) {
+            return PROJECT_TAB_MAX_WIDTH;
+        }
+        if (availableWidth <= 0.0f) {
+            return 160.0f;
+        }
+        float widthPerTab = (availableWidth - Math.max(0, count - 1)) / count;
+        return Mth.clamp(widthPerTab, PROJECT_TAB_MIN_WIDTH, PROJECT_TAB_MAX_WIDTH);
+    }
+
+    private String projectTabTitle(NPCProject project) {
+        File projectFile = getCurrentProjectFile();
+        if (projectFile != null) {
+            return EditorFileNames.normalizeBaseName(projectFile.getName(), NPCProject.FORMAT.projectSuffix(), NPCProject.FORMAT.runtimeSuffix());
+        }
+        String baseName = npcProjectBaseName(project);
+        EditorWindow window = getWindow();
+        if (untitledProjectIndex > 0 && window != null && window.hasMultipleEditors()) {
+            return baseName + " #" + untitledProjectIndex;
+        }
+        return baseName;
+    }
+
+    private String npcProjectBaseName(NPCProject project) {
+        String npcType = EditorFileNames.normalizeBaseName(project.getCurrentNpcType());
+        if (!npcType.isBlank()) {
+            return npcType;
+        }
+        NpcBasicsSetting basics = project.npc.npcConfig.getNpcData(NpcBasicsSetting.class);
+        if (basics != null && !basics.getCustomName().isBlank()) {
+            return basics.getCustomName();
+        }
+        return Component.translatable("editor.project.npc.add").getString();
     }
 
     private Tab createNpcEditorPageTab(INpcEditorPage page) {

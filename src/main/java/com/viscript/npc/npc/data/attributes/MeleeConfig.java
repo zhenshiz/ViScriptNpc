@@ -34,9 +34,6 @@ public class MeleeConfig implements INpcData {
     @Configurable(name = "npcConfig.npcAttributes.meleeConfig.attackDamage")
     @ConfigNumber(range = {0, 2048}, wheel = 0.1)
     private double attackDamage = 2;
-    @Configurable(name = "npcConfig.npcAttributes.meleeConfig.attackSpeed")
-    @ConfigNumber(range = {1, Integer.MAX_VALUE}, wheel = 1)
-    private int attackSpeed = 20;
     @Configurable(name = "npcConfig.npcAttributes.meleeConfig.attackRange")
     @ConfigNumber(range = {1, Integer.MAX_VALUE}, wheel = 1)
     private double attackRange = 2;
