@@ -75,22 +75,6 @@ repositories {
         name = "magicTeam MavenSnapshots"
         url = "https://maven.confluence.ink/snapshots"
     }
-    exclusiveContent {
-        forRepositories(
-                mavenLocal(),
-                maven {
-                    name = "attentionMindMavenReleases"
-                    url = "https://maven.confluence.ink/releases"
-                },
-                maven {
-                    name = "attentionMindMavenSnapshots"
-                    url = "https://maven.confluence.ink/snapshots"
-                }
-        )
-        filter {
-            includeGroup "org.thexeler"
-        }
-    }
 }
 
 base {
