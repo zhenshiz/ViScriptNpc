@@ -34,7 +34,6 @@ public class ViScriptNpc {
         NpcBehaviorDataSerializers.register();
         NpcRegister.ENTITY_TYPES.register(modEventBus);
         NpcAttachmentType.ATTACHMENT_TYPES.register(modEventBus);
-        modEventBus.addListener(NpcSerializationGameTests::register);
         PlayerUIMenuType.register(NpcEditor.EDITOR_ID, ignored -> player -> {
             if (player.level().isClientSide) {
                 ModularUI modularUI = new ModularUI(UI.of(EditorWindow.open(NpcEditor.EDITOR_ID, NpcEditor::new)))
