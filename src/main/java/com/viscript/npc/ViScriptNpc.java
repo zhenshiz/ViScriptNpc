@@ -7,7 +7,6 @@ import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.utils.ReflectionUtils;
 import com.mojang.logging.LogUtils;
-import com.viscript.npc.test.NpcSerializationGameTests;
 import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.npc.NpcAttachmentType;
 import com.viscript.npc.npc.NpcRegister;
