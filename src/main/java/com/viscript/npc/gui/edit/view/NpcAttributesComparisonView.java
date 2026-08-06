@@ -65,16 +65,6 @@ public class NpcAttributesComparisonView extends View implements INpcEditorSlotV
                 row("npcConfig.npcAttributes.outOfCombatRegenRate", current, NpcAttributes::getOutOfCombatRegenRate)
         ));
 
-        addGroup("viscript_npc.editor.attributes.group.offense", List.of(
-                row("npcConfig.npcAttributes.meleeConfig.attackDamage", current, attributes -> attributes.getMeleeConfig().getAttackDamage()),
-                row("npcConfig.npcAttributes.meleeConfig.attackRange", current, attributes -> attributes.getMeleeConfig().getAttackRange()),
-                row("npcConfig.npcAttributes.meleeConfig.knockback", current, attributes -> attributes.getMeleeConfig().getKnockback()),
-                row("npcConfig.npcAttributes.rangedConfig.damage", current, attributes -> attributes.getRangedConfig().getDamage()),
-                row("npcConfig.npcAttributes.rangedConfig.knockback", current, attributes -> attributes.getRangedConfig().getKnockback()),
-                row("npcConfig.npcAttributes.rangedConfig.speed", current, attributes -> attributes.getRangedConfig().getSpeed()),
-                row("npcConfig.npcAttributes.rangedConfig.explosionPower", current, attributes -> attributes.getRangedConfig().getExplosionPower())
-        ));
-
         addGroup("viscript_npc.editor.attributes.group.defense", List.of(
                 row("npcConfig.npcAttributes.defenseConfig.armor", current, attributes -> attributes.getDefenseConfig().getArmor()),
                 row("npcConfig.npcAttributes.defenseConfig.armorToughness", current, attributes -> attributes.getDefenseConfig().getArmorToughness()),

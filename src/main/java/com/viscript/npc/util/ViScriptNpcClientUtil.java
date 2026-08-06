@@ -11,6 +11,7 @@ import com.viscript.npc.gui.edit.NPCProject;
 import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.network.c2s.C2SPayload;
 import com.viscript.npc.npc.CustomNpc;
+import com.viscript.npc.npc.ai.editor.NpcAiDescriptorCache;
 import dev.latvian.mods.kubejs.typings.Info;
 import dev.vfyjxf.taffy.style.TaffyPosition;
 import lombok.Getter;
@@ -138,6 +139,14 @@ public class ViScriptNpcClientUtil {
             return;
         }
         NPC_AI_DEBUG_SNAPSHOTS.put(payload.getInt("entityId"), payload.copy());
+    }
+
+    public static void setNpcAiDescriptors(CompoundTag payload) {
+        NpcAiDescriptorCache.set(payload);
+    }
+
+    public static CompoundTag getNpcAiDescriptors() {
+        return NpcAiDescriptorCache.get();
     }
 
     public static CompoundTag getNpcAiDebugSnapshot(int entityId) {

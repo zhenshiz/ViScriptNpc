@@ -15,7 +15,9 @@ import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.ViScriptNpcRegistries;
 import com.viscript.npc.gui.edit.page.INpcEditorPage;
 import com.viscript.npc.gui.edit.view.*;
+import com.viscript.npc.npc.ai.editor.AMIntentionGraphView;
 import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
+import com.viscript.npc.util.AMIntentionServerUploads;
 import com.viscript.npc.util.ViScriptNpcClientUtil;
 import com.viscript_lib.gui.editor.*;
 import dev.vfyjxf.taffy.style.AlignItems;
@@ -63,9 +65,12 @@ public class NpcEditor extends ProjectFileEditor {
     private boolean lastProjectPageBarOffset;
     private boolean npcAiWorldTestCollapsedRightWindow;
     private boolean npcAiWorldTestRightWasCollapsed;
+    @Nullable
+    private AMIntentionGraphView amIntentionGraphView;
 
     public NpcEditor() {
         registerProjectType(NPCProject.PROVIDER);
+        registerProjectType(AMIntentionProject.PROVIDER);
         this.icon.style(style -> style.backgroundTexture(ICON));
         detachDefaultInspectorView();
         initNpcEditorPageBar();
@@ -89,6 +94,18 @@ public class NpcEditor extends ProjectFileEditor {
                     fileName -> EditorServerUploads.uploadProjectToServer(format, fileName, project.serializeNBT(Platform.getFrozenRegistry()))
             );
         }
+        if (getCurrentProject() instanceof AMIntentionProject project) {
+            EditorFileFormat format = AMIntentionProject.FORMAT;
+            return new NpcUploadAction(
+                    "viscript_lib.editor.menu.upload_project_file",
+                    "viscript_lib.editor.dialog.upload_project_file",
+                    amProjectBaseName(project),
+                    format.projectSuffix(),
+                    fileName -> EditorFileNames.normalizeFileName(fileName, format.projectSuffix()),
+                    fileName -> EditorServerUploads.uploadProjectToServer(
+                            format, fileName, project.serializeNBT(Platform.getFrozenRegistry()))
+            );
+        }
         return null;
     }
 
@@ -103,6 +120,17 @@ public class NpcEditor extends ProjectFileEditor {
                     format.runtimeSuffix(),
                     fileName -> EditorFileNames.normalizeFileName(fileName, format.runtimeSuffix()),
                     fileName -> EditorServerUploads.uploadToServer(format, fileName, project.serializeRuntimeFile(Platform.getFrozenRegistry()))
+            );
+        }
+        if (getCurrentProject() instanceof AMIntentionProject project) {
+            return new NpcUploadAction(
+                    "viscript_lib.editor.menu.upload_runtime_file",
+                    "viscript_lib.editor.dialog.upload_runtime_file",
+                    amAssetId(project).toString(),
+                    ".json",
+                    NpcEditor::normalizeAmAssetId,
+                    fileName -> AMIntentionServerUploads.upload(
+                            ResourceLocation.parse(normalizeAmAssetId(fileName)), project.compile())
             );
         }
         return null;
@@ -124,6 +152,23 @@ public class NpcEditor extends ProjectFileEditor {
                     }
             );
         }
+        if (getCurrentProject() instanceof AMIntentionProject project) {
+            EditorFileFormat format = AMIntentionProject.FORMAT;
+            return new NpcUploadAction(
+                    "viscript_lib.editor.menu.upload_project_and_runtime_file",
+                    "viscript_lib.editor.dialog.upload_project_and_runtime_file",
+                    amAssetId(project).toString(),
+                    "",
+                    NpcEditor::normalizeAmAssetId,
+                    fileName -> {
+                        ResourceLocation id = ResourceLocation.parse(normalizeAmAssetId(fileName));
+                        String projectName = id.getNamespace() + "_" + id.getPath().replace('/', '_');
+                        EditorServerUploads.uploadProjectToServer(format, projectName,
+                                project.serializeNBT(Platform.getFrozenRegistry()));
+                        AMIntentionServerUploads.upload(id, project.compile());
+                    }
+            );
+        }
         return null;
     }
 
@@ -138,10 +183,25 @@ public class NpcEditor extends ProjectFileEditor {
     @Override
     protected void loadNewProject(IProject project, @Nullable File projectFile) {
         if (project instanceof NPCProject npcProject) {
+            clearAmIntentionProjectView();
             untitledProjectIndex = projectFile == null ? NEXT_UNTITLED_PROJECT_INDEX++ : 0;
             super.loadNewProject(project, projectFile);
             ViScriptNpcClientUtil.cacheNpcProject = npcProject;
             loadNpcEditorPages();
+            refreshProjectTabs(true);
+        } else if (project instanceof AMIntentionProject amProject) {
+            clearNpcEditorPages();
+            clearAmIntentionProjectView();
+            untitledProjectIndex = projectFile == null ? NEXT_UNTITLED_PROJECT_INDEX++ : 0;
+            super.loadNewProject(project, projectFile);
+            amIntentionGraphView = new AMIntentionGraphView(amProject);
+            applyBasicSlotView(centerWindow.getLeftTop(), amIntentionGraphView);
+            applyBasicSlotView(rightWindow.getRightTop(), npcInspectorView);
+            applyBasicSlotView(leftWindow.getLeftTop(), getResourceView());
+            applyBasicSlotView(bottomWindow.getLeftBottom(), new NpcAiDebugView(amProject));
+            setLeftWindowVisible(true);
+            setRightWindowVisible(true);
+            setBottomWindowVisible(true);
             refreshProjectTabs(true);
         }
     }
@@ -149,6 +209,7 @@ public class NpcEditor extends ProjectFileEditor {
     @Override
     protected void closeCurrentProject() {
         super.closeCurrentProject();
+        clearAmIntentionProjectView();
         npcInspectorView.clear();
         clearNpcEditorPages();
         refreshProjectTabs(true);
@@ -159,7 +220,30 @@ public class NpcEditor extends ProjectFileEditor {
         if (getCurrentProject() instanceof NPCProject project) {
             return Component.literal(projectTabTitle(project));
         }
+        if (getCurrentProject() instanceof AMIntentionProject project) {
+            return Component.literal(amProjectBaseName(project));
+        }
         return super.getTitle();
+    }
+
+    private ResourceLocation amAssetId(AMIntentionProject project) {
+        var compilation = project.compile();
+        return compilation.assetId() == null ? ViScriptNpc.id("new_intention") : compilation.assetId();
+    }
+
+    private String amProjectBaseName(AMIntentionProject project) {
+        File projectFile = getCurrentProjectFile();
+        if (projectFile != null) {
+            return EditorFileNames.normalizeBaseName(projectFile.getName(),
+                    AMIntentionProject.FORMAT.projectSuffix(), AMIntentionProject.FORMAT.runtimeSuffix());
+        }
+        return amAssetId(project).toString();
+    }
+
+    private static String normalizeAmAssetId(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.endsWith(".json")) normalized = normalized.substring(0, normalized.length() - 5);
+        return ResourceLocation.parse(normalized).toString();
     }
 
     @Override
@@ -444,6 +528,35 @@ public class NpcEditor extends ProjectFileEditor {
             }
             viewFallbacks.remove(view);
         }
+    }
+
+    public void reloadNpcEditorPages() {
+        if (getCurrentProject() instanceof NPCProject) loadNpcEditorPages();
+    }
+
+    private void clearAmIntentionProjectView() {
+        if (amIntentionGraphView == null) return;
+        if (amIntentionGraphView.hasParent()) amIntentionGraphView.removeSelf();
+        viewFallbacks.remove(amIntentionGraphView);
+        amIntentionGraphView = null;
+    }
+
+    private void applyBasicSlotView(ViewContainer container, @Nullable View targetView) {
+        for (View existing : new ArrayList<>(container.getAllViews())) {
+            if (existing == historyView) {
+                existing.setDisplay(existing == targetView);
+            } else if (existing != targetView) {
+                existing.removeSelf();
+                viewFallbacks.remove(existing);
+            }
+        }
+        if (targetView == null) return;
+        if (targetView.getViewContainer() != container) {
+            if (targetView.getViewContainer() == null) placeView(targetView, () -> container);
+            else container.addView(targetView);
+        }
+        targetView.setDisplay(true);
+        container.selectView(targetView);
     }
 
     private void applySlotView(ViewContainer container, @Nullable View targetView, NPCProject project, INpcEditorPage page) {

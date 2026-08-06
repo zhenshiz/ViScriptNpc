@@ -8,8 +8,8 @@ import com.viscript.npc.compat.team.NpcFactionBridge;
 import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.CustomNpc;
 import com.viscript.npc.npc.NpcRegister;
+import com.viscript.npc.npc.ai.AMIntentionAssetPublisher;
 import com.viscript.npc.npc.data.ai.NpcAI;
-import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorDataSerializers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -40,8 +40,41 @@ public class C2SPayload {
     public static final String STOP_NPC_AI_DEBUG = "stopNpcAiDebug";
     public static final String REQUEST_NPC_AI_DEBUG_SNAPSHOT = "requestNpcAiDebugSnapshot";
     public static final String SYNC_NPC_AI_DEBUG_CONFIG = "syncNpcAiDebugConfig";
-    public static final String SET_NPC_AI_DEBUG_IGNORED_PLAYER = "setNpcAiDebugIgnoredPlayer";
     public static final String REQUEST_FACTION_IDS = "requestFactionIds";
+    public static final String UPLOAD_AM_INTENTION_ASSET = "uploadAmIntentionAsset";
+    public static final String SET_NPC_AI_DEBUG_BREAKPOINTS = "setNpcAiDebugBreakpoints";
+
+    @RPCPacket(UPLOAD_AM_INTENTION_ASSET)
+    public static void uploadAmIntentionAsset(RPCSender sender, String assetId, String json) {
+        if (sender.isServer()) return;
+        ServerPlayer player = sender.asPlayer();
+        if (player == null) return;
+        try {
+            AMIntentionAssetPublisher.publish(player, assetId, json);
+        } catch (RuntimeException exception) {
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                    "AM intention publish failed: " + exception.getMessage()));
+        }
+    }
+
+    @RPCPacket(SET_NPC_AI_DEBUG_BREAKPOINTS)
+    public static void setNpcAiDebugBreakpoints(RPCSender sender, int entityId, CompoundTag payload) {
+        if (sender.isServer()) return;
+        ServerPlayer player = sender.asPlayer();
+        CustomNpc npc = getWorldTestNpc(player, entityId);
+        if (npc == null) return;
+        Set<java.util.UUID> parsed = new java.util.LinkedHashSet<>();
+        if (payload != null) {
+            ListTag ids = payload.getList("values", net.minecraft.nbt.Tag.TAG_STRING);
+            for (int index = 0; index < ids.size(); index++) {
+                String id = ids.getString(index);
+                try { parsed.add(java.util.UUID.fromString(id)); }
+                catch (IllegalArgumentException ignored) {}
+            }
+        }
+        npc.setNpcAiDebugBreakpoints(parsed);
+        sendNpcAiDebugSnapshot(player, entityId, npc);
+    }
 
     @RPCPacket(CREATE_NEW_NPC)
     public static void createNewNpc(RPCSender sender, CompoundTag tag) {
@@ -145,9 +178,9 @@ public class C2SPayload {
             CustomNpc npc = getWorldTestNpc(player, entityId);
             if (npc == null) return;
             if (paused) {
-                npc.setNpcBehaviorDebugPaused(true);
+                npc.setNpcAiDebugPaused(true);
             } else {
-                npc.continueNpcBehaviorDebug();
+                npc.continueNpcAiDebug();
             }
             sendNpcAiDebugSnapshot(player, entityId, npc);
         }
@@ -159,7 +192,7 @@ public class C2SPayload {
             ServerPlayer player = sender.asPlayer();
             CustomNpc npc = getWorldTestNpc(player, entityId);
             if (npc == null) return;
-            npc.continueNpcBehaviorDebug();
+            npc.continueNpcAiDebug();
             sendNpcAiDebugSnapshot(player, entityId, npc);
         }
     }
@@ -170,7 +203,7 @@ public class C2SPayload {
             ServerPlayer player = sender.asPlayer();
             CustomNpc npc = getWorldTestNpc(player, entityId);
             if (npc == null) return;
-            npc.stepNpcBehaviorDebug();
+            npc.stepNpcAiDebug();
             sendNpcAiDebugSnapshot(player, entityId, npc);
         }
     }
@@ -181,7 +214,7 @@ public class C2SPayload {
             ServerPlayer player = sender.asPlayer();
             CustomNpc npc = getWorldTestNpc(player, entityId);
             if (npc == null) return;
-            npc.stopNpcBehaviorDebug();
+            npc.stopNpcAiDebug();
             sendNpcAiDebugSnapshot(player, entityId, npc);
         }
     }
@@ -204,23 +237,7 @@ public class C2SPayload {
             if (npc == null || aiTag == null || aiTag.isEmpty()) return;
             NpcAI ai = npc.getNpcAI();
             ai.deserializeNBT(Platform.getFrozenRegistry(), aiTag);
-            ai.setBehaviorProgram(ai.getCompiledBehaviorProgram());
             npc.updateNpcState();
-            sendNpcAiDebugSnapshot(player, entityId, npc);
-        }
-    }
-
-    @RPCPacket(SET_NPC_AI_DEBUG_IGNORED_PLAYER)
-    public static void setNpcAiDebugIgnoredPlayer(RPCSender sender, int entityId, boolean ignored) {
-        if (!sender.isServer()) {
-            ServerPlayer player = sender.asPlayer();
-            CustomNpc npc = getWorldTestNpc(player, entityId);
-            if (player == null || npc == null) return;
-            if (ignored) {
-                npc.setNpcBehaviorEditorDebugIgnoredPlayer(player.getUUID());
-            } else {
-                npc.clearNpcBehaviorEditorDebugIgnoredPlayer(player.getUUID());
-            }
             sendNpcAiDebugSnapshot(player, entityId, npc);
         }
     }
@@ -231,7 +248,8 @@ public class C2SPayload {
             ServerPlayer player = sender.asPlayer();
             if (player == null) return;
             Set<String> factionIds = NpcFactionBridge.getFactionIds(player.serverLevel());
-            RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_FACTION_IDS, factionIds);
+            RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_FACTION_IDS,
+                    S2CPayload.encodeStrings(factionIds));
         }
     }
 
@@ -273,12 +291,11 @@ public class C2SPayload {
 
     private static void sendNpcAiDebugSnapshot(ServerPlayer player, int entityId, CustomNpc npc) {
         if (player == null || npc == null) return;
-        NpcBehaviorDataSerializers.register();
         CompoundTag payload = new CompoundTag();
         payload.putInt("entityId", entityId);
-        payload.putBoolean("paused", npc.isNpcBehaviorDebugPaused());
+        payload.putBoolean("paused", npc.isNpcAiDebugPaused());
         payload.putString("npcType", npc.getNpcType());
-        payload.put("snapshot", npc.getNpcBehaviorDebugSnapshot().serializeNBT(Platform.getFrozenRegistry()));
+        payload.put("snapshot", npc.getAiDebugSnapshot());
         RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_NPC_AI_DEBUG_SNAPSHOT, payload);
     }
 }

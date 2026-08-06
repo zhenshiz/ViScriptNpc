@@ -1,7 +1,8 @@
 package com.viscript.npc.npc;
 
 import com.viscript.npc.compat.team.NpcFactionBridge;
-import com.viscript.npc.npc.data.attributes.RangedConfig;
+import com.viscript.npc.npc.data.ai.attack.AttackEffectData;
+import com.viscript.npc.npc.data.ai.attack.RangedAttackData;
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
@@ -33,7 +34,7 @@ public class NpcProjectile extends ThrowableItemProjectile {
     private double knockback;
     private float explosionPower;
     private boolean explosionBreaksBlocks;
-    private String additionalEffect = RangedConfig.AdditionalEffects.NONE.getSerializedName();
+    private String additionalEffect = AttackEffectData.Type.NONE.serializedName();
     private String debuffEffect = ResourceLocation.withDefaultNamespace("slowness").toString();
     private int effectSeconds;
     private int effectAmplifier;
@@ -46,20 +47,20 @@ public class NpcProjectile extends ThrowableItemProjectile {
         super(NpcRegister.CUSTOM_NPC_PROJECTILE.get(), shooter, level);
     }
 
-    public void configureFrom(RangedConfig config) {
-        this.damage = Math.max(0.0D, config.getDamage());
-        this.knockback = Math.max(0.0D, config.getKnockback());
-        this.explosionPower = Math.max(0.0F, config.getExplosionPower());
-        this.explosionBreaksBlocks = config.isExplosionBreaksBlocks();
-        this.additionalEffect = config.getAdditionalEffects().getSerializedName();
-        this.debuffEffect = config.getDebuffEffect();
-        this.effectSeconds = config.getSeconds().intValue();
-        this.effectAmplifier = config.getAmplifier().intValue();
-        this.setItem(config.getProjectileItemForDisplay());
-        this.setAffectedByGravity(config.isAffectedByGravity());
-        this.setVisualScale(config.getVisualScale());
-        this.setTrailType(config.getTrailType());
-        this.setHitSound(config.getHitSound());
+    public void configureFrom(RangedAttackData data) {
+        this.damage = data.damage();
+        this.knockback = data.knockback();
+        this.explosionPower = data.explosionPower();
+        this.explosionBreaksBlocks = data.explosionBreaksBlocks();
+        this.additionalEffect = data.effect().type().serializedName();
+        this.debuffEffect = data.effect().effectId();
+        this.effectSeconds = data.effect().seconds();
+        this.effectAmplifier = data.effect().amplifier();
+        this.setItem(data.projectileItemStack());
+        this.setAffectedByGravity(data.affectedByGravity());
+        this.setVisualScale(data.visualScale());
+        this.setTrailType(data.trailType());
+        this.setHitSound(data.hitSound());
     }
 
     public float getVisualScale() {
@@ -78,12 +79,12 @@ public class NpcProjectile extends ThrowableItemProjectile {
         return this.getEntityData().get(DATA_GRAVITY);
     }
 
-    private void setTrailType(RangedConfig.TrailType trailType) {
-        this.getEntityData().set(DATA_TRAIL_TYPE, trailType.getSerializedName());
+    private void setTrailType(String trailType) {
+        this.getEntityData().set(DATA_TRAIL_TYPE, trailType == null ? "none" : trailType);
     }
 
-    private RangedConfig.TrailType getTrailType() {
-        return RangedConfig.TrailType.bySerializedName(this.getEntityData().get(DATA_TRAIL_TYPE));
+    private String getTrailType() {
+        return this.getEntityData().get(DATA_TRAIL_TYPE);
     }
 
     private void setHitSound(String hitSound) {
@@ -100,7 +101,7 @@ public class NpcProjectile extends ThrowableItemProjectile {
         super.defineSynchedData(builder);
         builder.define(DATA_GRAVITY, true);
         builder.define(DATA_VISUAL_SCALE, 1.0F);
-        builder.define(DATA_TRAIL_TYPE, RangedConfig.TrailType.NONE.getSerializedName());
+        builder.define(DATA_TRAIL_TYPE, "none");
         builder.define(DATA_HIT_SOUND, "minecraft:entity.arrow.hit");
     }
 
@@ -209,12 +210,12 @@ public class NpcProjectile extends ThrowableItemProjectile {
     }
 
     private void spawnTrailParticle() {
-        ParticleOptions particle = switch (getTrailType()) {
-            case NONE -> null;
-            case SMOKE -> ParticleTypes.SMOKE;
-            case FLAME -> ParticleTypes.FLAME;
-            case MAGIC -> ParticleTypes.WITCH;
-            case CRIT -> ParticleTypes.CRIT;
+        ParticleOptions particle = switch (getTrailType().toLowerCase(java.util.Locale.ROOT)) {
+            case "smoke" -> ParticleTypes.SMOKE;
+            case "flame" -> ParticleTypes.FLAME;
+            case "magic" -> ParticleTypes.WITCH;
+            case "crit" -> ParticleTypes.CRIT;
+            default -> null;
         };
         if (particle == null) {
             return;
@@ -233,7 +234,7 @@ public class NpcProjectile extends ThrowableItemProjectile {
 
     private void playHitSound() {
         this.playSound(
-                RangedConfig.soundOrDefault(this.getEntityData().get(DATA_HIT_SOUND), SoundEvents.ARROW_HIT),
+                RangedAttackData.soundOrDefault(this.getEntityData().get(DATA_HIT_SOUND), SoundEvents.ARROW_HIT),
                 1.0F,
                 1.0F / (this.random.nextFloat() * 0.2F + 0.9F)
         );
@@ -278,7 +279,7 @@ public class NpcProjectile extends ThrowableItemProjectile {
     }
 
     private void applyAdditionalEffect(LivingEntity target) {
-        switch (RangedConfig.AdditionalEffects.bySerializedName(additionalEffect)) {
+        switch (AttackEffectData.Type.parse(additionalEffect)) {
             case FIRE -> target.igniteForSeconds((float) effectSeconds);
             case POTION -> {
                 ResourceLocation effectKey = ResourceLocation.tryParse(debuffEffect);
@@ -286,6 +287,8 @@ public class NpcProjectile extends ThrowableItemProjectile {
                     BuiltInRegistries.MOB_EFFECT.getHolder(effectKey).ifPresent(effect ->
                             target.addEffect(new net.minecraft.world.effect.MobEffectInstance(effect, effectSeconds * 20, effectAmplifier, false, false)));
                 }
+            }
+            case NONE -> {
             }
         }
     }

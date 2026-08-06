@@ -10,14 +10,14 @@ import com.viscript.npc.compat.team.NpcFactionBridge;
 import com.viscript.npc.event.neoforge.NpcEvent;
 import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.data.INpcData;
-import com.viscript.npc.npc.data.ai.IntentionEntry;
+import com.viscript.npc.npc.ai.NpcMindActor;
+import com.viscript.npc.npc.ai.NpcAiDebugNbt;
+import com.viscript.npc.npc.ai.flow.NpcFlowRuntime;
+import com.viscript.npc.npc.ai.flow.NpcAiDependencyIndex;
+import com.viscript.npc.npc.ai.flow.NpcFlowTemplateRegistry;
+import com.viscript.npc.npc.ai.flow.NpcFlowExtensionRegistry;
 import com.viscript.npc.npc.data.ai.NpcAI;
-import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorDebugSnapshot;
-import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorRuntime;
-import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorTreeIntention;
-import com.viscript.npc.npc.data.attributes.MeleeConfig;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
-import com.viscript.npc.npc.data.attributes.RangedConfig;
 import com.viscript.npc.npc.data.attributes.ResistanceConfig;
 import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
 import com.viscript.npc.npc.data.inventory.LootTableConfig;
@@ -45,11 +45,8 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.ai.navigation.WaterBoundPathNavigation;
-import net.minecraft.world.entity.monster.CrossbowAttackMob;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.ProjectileWeaponItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -62,7 +59,6 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.common.CommonHooks;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import net.neoforged.neoforge.event.OnDatapackSyncEvent;
@@ -73,11 +69,10 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
+import org.thexeler.AttentionMind;
 import org.thexeler.MindMachine;
-import org.thexeler.api.IntentionPriority;
-import org.thexeler.api.IntentionTypeRegistry;
 import org.thexeler.api.MindMachineManager;
-import org.thexeler.intention.BaseIntention;
+import org.thexeler.api.persistence.MachineLoadResult;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Objects;
@@ -88,14 +83,26 @@ import java.util.stream.Collectors;
 @SuppressWarnings("deprecation")
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
-public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
+public class CustomNpc extends PathfinderMob {
     protected final WaterBoundPathNavigation waterNavigation;
     protected final GroundPathNavigation groundNavigation;
     @Nullable
     private MindMachine mind;
     @Nullable
-    private NpcBehaviorTreeIntention behaviorTreeIntention;
+    private NpcMindActor mindActor;
+    @Nullable
+    private NpcFlowRuntime flowRuntime;
+    @Nullable
+    private CompoundTag pendingMindState;
+    @Nullable
+    private CompoundTag pendingFlowState;
+    private String aiDefinitionFailure = "";
+    @Nullable
+    private CompoundTag pendingPersistentVariables;
     private int mindConfigHash;
+    private Set<String> amDebugBreakpoints = Set.of();
+    @Nullable
+    private String amDebugBreakpointSkipNode;
     public static Set<String> lootTableKeys = Set.of();
     public static Set<String> factionIds = Set.of();
 
@@ -132,57 +139,6 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         return previewCameraOrientation;
     }
 
-    @Override
-    protected void registerGoals() {
-        // Vanilla goals are intentionally empty. Server-side decision making is owned by AM MindMachine.
-    }
-
-    @Override
-    public void setChargingCrossbow(boolean b) {
-    }
-
-    @Override
-    public void onCrossbowAttackPerformed() {
-        this.noActionTime = 0;
-    }
-
-    @Override
-    public ItemStack getProjectile(ItemStack weapon) {
-        if (weapon.getItem() instanceof ProjectileWeaponItem weaponItem) {
-            var ammo = ProjectileWeaponItem.getHeldProjectile(this, weaponItem.getSupportedHeldProjectiles(weapon));
-            return CommonHooks.getProjectile(this, weapon, ammo.isEmpty() ? new ItemStack(Items.ARROW) : ammo);
-        } else return CommonHooks.getProjectile(this, weapon, ItemStack.EMPTY);
-    }
-
-    @Override
-    public void performRangedAttack(LivingEntity target, float v) {
-    }
-
-    public boolean shootRangedProjectile(LivingEntity target, int projectilesPerShot, float inaccuracy) {
-        if (target == null || !target.isAlive()) {
-            return false;
-        }
-        RangedConfig rangedConfig = getNpcAttributes().getRangedConfig();
-        int count = Mth.clamp(projectilesPerShot, 1, 64);
-        float speed = Math.max(0.1F, rangedConfig.getSpeed());
-        boolean spawned = false;
-        for (int i = 0; i < count; i++) {
-            NpcProjectile projectile = new NpcProjectile(level(), this);
-            projectile.configureFrom(rangedConfig);
-            double x = target.getX() - this.getX();
-            double y = target.getY(0.3333333333333333D) - projectile.getY();
-            double z = target.getZ() - this.getZ();
-            double horizontal = Math.sqrt(x * x + z * z);
-            projectile.shoot(x, y + horizontal * 0.2D, z, speed, Math.max(0.0F, inaccuracy));
-            level().addFreshEntity(projectile);
-            spawned = true;
-        }
-        if (spawned) {
-            playSound(rangedConfig.getShootSoundEvent(), 1.0F, 1.0F / (getRandom().nextFloat() * 0.4F + 0.8F));
-        }
-        return spawned;
-    }
-
     public void updateSwimming() { // 临时的
         if (!this.level().isClientSide) {
             if (this.isInWater()) {
@@ -198,13 +154,17 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     @Override
     public void tick() {
         super.tick();
-        NeoForge.EVENT_BUS.post(new NpcEvent.Tick(this));
         if (!level().isClientSide()) {
+            NeoForge.EVENT_BUS.post(new NpcEvent.Tick(this));
             if (tickCommandPathTestOverride()) {
                 return;
             }
             if (mind != null) {
+                if (flowRuntime != null) flowRuntime.tick();
+                if (flowRuntime != null && flowRuntime.isPaused()) mind.pause();
+                applyAmDebugBreakpoint();
                 mind.tick();
+                mindActor.moveControl().tick();
             }
         } else {
             this.moveCloak();
@@ -293,22 +253,6 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     }
 
     @Override
-    protected AABB getAttackBoundingBox() {
-        Entity entity = this.getVehicle();
-        AABB aabb;
-        if (entity != null) {
-            AABB aabb1 = entity.getBoundingBox();
-            AABB aabb2 = this.getBoundingBox();
-            aabb = new AABB(Math.min(aabb2.minX, aabb1.minX), aabb2.minY, Math.min(aabb2.minZ, aabb1.minZ), Math.max(aabb2.maxX, aabb1.maxX), aabb2.maxY, Math.max(aabb2.maxZ, aabb1.maxZ));
-        } else {
-            aabb = this.getBoundingBox();
-        }
-        double attackRange = this.getNpcAttributes().getMeleeConfig().getAttackRange();
-
-        return aabb.inflate(attackRange, 0.0F, attackRange);
-    }
-
-    @Override
     public void makeStuckInBlock(BlockState state, Vec3 motionMultiplier) {
         if (!state.is(Blocks.COBWEB) || !this.getNpcAttributes().isIgnoreCobweb()) {
             super.makeStuckInBlock(state, motionMultiplier);
@@ -352,9 +296,18 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
                 setData(NpcAttachmentType.getAttachment(clazz), npcAttachment);
             } catch (Exception ignored) {}
         });
-        if (!level().isClientSide && tag.contains("mind")) {
+        if (!level().isClientSide) {
+            pendingMindState = tag.contains("mind", net.minecraft.nbt.Tag.TAG_COMPOUND)
+                    ? tag.getCompound("mind").copy()
+                    : null;
+            pendingFlowState = tag.contains("flow_runtime", net.minecraft.nbt.Tag.TAG_COMPOUND)
+                    ? tag.getCompound("flow_runtime").copy()
+                    : null;
+            pendingPersistentVariables = null;
             mind = null;
-            behaviorTreeIntention = null;
+            mindActor = null;
+            flowRuntime = null;
+            aiDefinitionFailure = "";
             mindConfigHash = 0;
         }
         updateNpcState();
@@ -364,7 +317,8 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     public void addAdditionalSaveData(CompoundTag compoundTag) {
         super.addAdditionalSaveData(compoundTag);
         if (mind != null) {
-            compoundTag.put("mind", mind.serialize());
+            compoundTag.put("mind", mind.save());
+            if (flowRuntime != null) compoundTag.put("flow_runtime", flowRuntime.save());
         }
     }
 
@@ -382,9 +336,6 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         NpcAttributes npcAttributes = getNpcAttributes();
         this.setAttributeBaseValue(Attributes.MAX_HEALTH, npcAttributes.getMaxHealth());
         this.setAttributeBaseValue(Attributes.MOVEMENT_SPEED, npcAttributes.getMovementSpeed());
-        //近战属性
-        this.setAttributeBaseValue(Attributes.ATTACK_DAMAGE, npcAttributes.getMeleeConfig().getAttackDamage());
-        this.setAttributeBaseValue(Attributes.ATTACK_KNOCKBACK, npcAttributes.getMeleeConfig().getKnockback());
         this.setAttributeBaseValue(Attributes.KNOCKBACK_RESISTANCE, npcAttributes.getResistanceConfig().getKnockback());
         //防御
         this.setAttributeBaseValue(Attributes.ARMOR, npcAttributes.getDefenseConfig().getArmor());
@@ -483,6 +434,11 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         return mind;
     }
 
+    @Nullable
+    public NpcFlowRuntime getFlowRuntime() {
+        return flowRuntime;
+    }
+
     public void initMind() {
         if (this.level().isClientSide || mind != null) return;
         initMind(getNpcAI(), currentMindConfigHash(getNpcAI()));
@@ -490,20 +446,58 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
 
     private void initMind(NpcAI ai, int configHash) {
         if (this.level().isClientSide || mind != null) return;
-        mind = MindMachineManager.getInstance().createInstance(this, ai.toConfig());
-        mindConfigHash = configHash;
-        if (ai.getBehaviorGraph() != null && !ai.getBehaviorGraph().isEmpty()) {
-            behaviorTreeIntention = new NpcBehaviorTreeIntention(mind, ai);
-            mind.addIntention(IntentionPriority.URGENT, behaviorTreeIntention);
+        final NpcFlowTemplateRegistry.Resolved resolvedDefinition;
+        try {
+            resolvedDefinition = NpcFlowTemplateRegistry.getInstance().resolve(ai);
+        } catch (RuntimeException exception) {
+            aiDefinitionFailure = exception.getMessage() == null
+                    ? exception.getClass().getSimpleName() : exception.getMessage();
+            mindConfigHash = configHash;
+            ViScriptNpc.LOGGER.warn("NPC {} AI definition is invalid: {}", getUUID(), aiDefinitionFailure);
+            return;
         }
-        for (IntentionEntry entry : ai.getIntentions()) {
-            try {
-                BaseIntention intention = IntentionTypeRegistry.deserialize(entry.getType(), mind, entry.getData());
-                mind.addIntention(entry.getPriority(), intention);
-            } catch (IllegalArgumentException ignored) {
-                // Unknown intention type; keep the rest of the configured mind usable.
+        String globalFailure = NpcAiDependencyIndex.definitionFailure();
+        if (!globalFailure.isEmpty()) {
+            aiDefinitionFailure = globalFailure;
+            NpcAiDependencyIndex.register(this, resolvedDefinition.dependencies());
+            mindConfigHash = configHash;
+            return;
+        }
+        aiDefinitionFailure = "";
+        mindActor = new NpcMindActor(this);
+        String savedDefinitionHash = ai.usesTemplate() ? ai.getResolvedHash() : ai.getEmbeddedDependencyHash();
+        if (pendingMindState != null && !resolvedDefinition.resolvedHash().equals(savedDefinitionHash)) {
+            ViScriptNpc.LOGGER.info("Resetting stale AI state for NPC {} ({} -> {})", getUUID(),
+                    savedDefinitionHash, resolvedDefinition.resolvedHash());
+            pendingMindState = null;
+            pendingPersistentVariables = pendingFlowState == null ? null
+                    : pendingFlowState.getCompound("variables").copy();
+            pendingFlowState = null;
+        }
+        if (pendingMindState != null) {
+            MachineLoadResult load = MindMachine.load(mindActor, pendingMindState,
+                    AttentionMind.intentionTypes(), AttentionMind.intentionAssets());
+            pendingMindState = null;
+            if (load.isSuccess()) {
+                mind = MindMachineManager.getInstance().registerInstance(load.machine().orElseThrow());
+            } else {
+                ViScriptNpc.LOGGER.warn("Discarding invalid AM state for NPC {}: {}", getUUID(), load.diagnostics());
             }
         }
+        if (mind == null) {
+            mind = MindMachineManager.getInstance().createInstance(mindActor, ai.toConfig());
+        }
+        flowRuntime = new NpcFlowRuntime(this, mind);
+        if (pendingFlowState != null) {
+            flowRuntime.restore(pendingFlowState);
+            pendingFlowState = null;
+        }
+        if (pendingPersistentVariables != null) {
+            flowRuntime.restorePersistentVariables(pendingPersistentVariables);
+            pendingPersistentVariables = null;
+        }
+        NpcAiDependencyIndex.register(this, flowRuntime.dependencies());
+        mindConfigHash = configHash;
     }
 
     private void syncMindState(NpcAI ai) {
@@ -515,6 +509,9 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
 
         int configHash = currentMindConfigHash(ai);
         if (mind == null) {
+            String globalFailure = NpcAiDependencyIndex.definitionFailure();
+            if (!globalFailure.isEmpty() && globalFailure.equals(aiDefinitionFailure)
+                    && mindConfigHash == configHash) return;
             initMind(ai, configHash);
         } else if (mindConfigHash != configHash) {
             clearMind();
@@ -523,78 +520,132 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     }
 
     private void clearMind() {
+        NpcAiDependencyIndex.unregister(getUUID());
         if (mind != null) {
             MindMachineManager.getInstance().removeInstance(this);
             mind = null;
         }
-        behaviorTreeIntention = null;
+        mindActor = null;
+        flowRuntime = null;
+        pendingMindState = null;
+        pendingFlowState = null;
+        pendingPersistentVariables = null;
         mindConfigHash = 0;
     }
 
-    public boolean isNpcBehaviorDebugPaused() {
-        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
-        return runtime != null && runtime.isDebugPaused();
-    }
-
-    public void setNpcBehaviorDebugPaused(boolean paused) {
-        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
-        if (runtime != null) {
-            runtime.setDebugPaused(paused);
+    public void resetAiForDefinitionChange() {
+        if (level().isClientSide) return;
+        CompoundTag persistent = flowRuntime == null ? new CompoundTag() : flowRuntime.persistentVariables();
+        aiDefinitionFailure = "";
+        clearMind();
+        if (getNpcAI().isEnabled()) {
+            initMind();
+            if (flowRuntime != null) flowRuntime.restorePersistentVariables(persistent);
         }
     }
 
-    public void continueNpcBehaviorDebug() {
-        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
-        if (runtime != null) {
-            runtime.continueDebug();
+    public void invalidateAiForDefinitionFailure(String detail) {
+        if (level().isClientSide) return;
+        Set<net.minecraft.resources.ResourceLocation> dependencies = flowRuntime == null
+                ? Set.of() : flowRuntime.dependencies();
+        clearMind();
+        aiDefinitionFailure = detail == null ? "AI definition reload failed" : detail;
+        NpcAiDependencyIndex.register(this, dependencies);
+        mindConfigHash = currentMindConfigHash(getNpcAI());
+    }
+
+    public boolean isNpcAiDebugPaused() {
+        return (mind != null && mind.isPaused()) || (flowRuntime != null && flowRuntime.isPaused());
+    }
+
+    public void setNpcAiDebugPaused(boolean paused) {
+        if (mind != null) {
+            if (paused) mind.pause();
+            else mind.resume();
+        }
+        if (flowRuntime != null) {
+            if (paused) flowRuntime.pause();
+            else flowRuntime.resume();
         }
     }
 
-    public void stepNpcBehaviorDebug() {
-        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
-        if (runtime != null) {
-            runtime.stepDebugTickNow();
-        }
+    public void continueNpcAiDebug() {
+        amDebugBreakpointSkipNode = currentAmDebugNode();
+        if (mind != null) mind.resume();
+        if (flowRuntime != null) flowRuntime.resume();
     }
 
-    public void stopNpcBehaviorDebug() {
-        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
-        if (runtime != null) {
-            runtime.stopDebug();
-        }
+    public void stepNpcAiDebug() {
+        amDebugBreakpointSkipNode = currentAmDebugNode();
+        if (flowRuntime != null) flowRuntime.stepOnce();
+        if (mind != null) mind.stepOnce();
     }
 
-    public void setNpcBehaviorEditorDebugIgnoredPlayer(UUID playerUuid) {
-        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
-        if (runtime != null) {
-            runtime.setEditorDebugIgnoredPlayer(playerUuid);
-        }
+    public void setNpcAiDebugBreakpoints(Set<UUID> breakpoints) {
+        if (flowRuntime != null) flowRuntime.setBreakpoints(breakpoints);
+        amDebugBreakpoints = breakpoints == null ? Set.of() : breakpoints.stream()
+                .map(id -> "n_" + id.toString().replace("-", ""))
+                .collect(Collectors.toUnmodifiableSet());
     }
 
-    public void clearNpcBehaviorEditorDebugIgnoredPlayer(UUID playerUuid) {
-        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
-        if (runtime != null) {
-            runtime.clearEditorDebugIgnoredPlayer(playerUuid);
-        }
+    public void stopNpcAiDebug() {
+        if (mind != null) mind.interrupt();
     }
 
-    public NpcBehaviorDebugSnapshot getNpcBehaviorDebugSnapshot() {
-        NpcBehaviorRuntime runtime = getNpcBehaviorRuntime();
-        return runtime == null ? new NpcBehaviorDebugSnapshot() : runtime.getLastDebugSnapshot();
+    private void applyAmDebugBreakpoint() {
+        String current = currentAmDebugNode();
+        if (current == null) {
+            amDebugBreakpointSkipNode = null;
+            return;
+        }
+        if (amDebugBreakpointSkipNode != null) {
+            if (amDebugBreakpointSkipNode.equals(current)) return;
+            amDebugBreakpointSkipNode = null;
+        }
+        if (amDebugBreakpoints.contains(current)) {
+            mind.pause();
+            if (flowRuntime != null) flowRuntime.pause();
+        }
     }
 
     @Nullable
-    private NpcBehaviorRuntime getNpcBehaviorRuntime() {
-        return behaviorTreeIntention == null ? null : behaviorTreeIntention.runtime();
+    private String currentAmDebugNode() {
+        if (mind == null) return null;
+        return mind.debugSnapshot().active().flatMap(value -> value.currentNode()).orElse(null);
+    }
+
+    public CompoundTag getAiDebugSnapshot() {
+        CompoundTag tag = new CompoundTag();
+        if (mind != null) {
+            tag.put("mind", mind.save());
+            tag.put("mind_debug", NpcAiDebugNbt.encode(mind.debugSnapshot()));
+        }
+        if (flowRuntime != null) tag.put("flow", flowRuntime.debugSnapshot());
+        if (!aiDefinitionFailure.isEmpty()) {
+            CompoundTag flow = tag.getCompound("flow");
+            net.minecraft.nbt.ListTag errors = flow.getList("errors", net.minecraft.nbt.Tag.TAG_COMPOUND);
+            CompoundTag error = new CompoundTag();
+            error.putString("code", "AI_DEFINITION_RELOAD_FAILED");
+            error.putString("detail", aiDefinitionFailure);
+            errors.add(error);
+            flow.put("errors", errors);
+            tag.put("flow", flow);
+        }
+        return tag;
     }
 
     private int currentMindConfigHash(NpcAI ai) {
-        return Objects.hash(ai.isEnabled(), ai.getTickRate(), ai.getNavigation(), ai.getIntentions(),
-                ai.getBehaviorGraph(), ai.getBehaviorProgram());
+        return Objects.hash(ai.isEnabled(), ai.getTickRate(), ai.getSource(), ai.getEmbeddedFlow(),
+                ai.getEmbeddedParameters(), ai.getTemplateId(), ai.getTemplateParameterOverrides(), ai.getResolvedHash(),
+                ai.getEmbeddedDependencyHash());
     }
 
     public String getNpcType() {
         return this.getNpcBasicsSetting().getNpcId();
+    }
+
+    public void triggerNpcFlow(String trigger, @Nullable LivingEntity target) {
+        if (flowRuntime != null) flowRuntime.trigger(trigger, target);
     }
 
     private void setAttributeBaseValue(Holder<Attribute> attribute, double value) {
@@ -605,6 +656,7 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
     @Override
     public void die(DamageSource source) {
         if (NeoForge.EVENT_BUS.post(new NpcEvent.Death(this, source)).isCanceled()) return;
+        triggerNpcFlow("death", source.getEntity() instanceof LivingEntity living ? living : null);
         super.die(source);
     }
 
@@ -658,10 +710,6 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         this.yCloak += d1 * 0.25;
     }
 
-    private void attack(CustomNpc npc, LivingEntity entity) {
-        MeleeConfig.executeAdditionalEffects(npc, entity);
-    }
-
     @Override
     public void checkDespawn() {
     }
@@ -700,15 +748,14 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.Hurt(event)).isCanceled()) {
                     event.setCanceled(true);
                 }
+                npc.triggerNpcFlow("hurt", source.getEntity() instanceof LivingEntity living ? living : null);
             }
             //npc攻击
             if (source.getEntity() instanceof CustomNpc npc) {
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.Attack(npc, event)).isCanceled()) {
                     event.setCanceled(true);
                 }
-                if (source.getDirectEntity() instanceof CustomNpc) {
-                    npc.attack(npc, event.getEntity());
-                }
+                npc.triggerNpcFlow("attack", event.getEntity());
             }
         }
 
@@ -738,16 +785,21 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.Interact(npc, serverPlayer)).isCanceled()) {
                     event.setCanceled(true);
                 }
+                npc.triggerNpcFlow("interact", serverPlayer);
             }
         }
 
         @SubscribeEvent
         public static void spawn(EntityJoinLevelEvent event) {
             if (event.getEntity() instanceof CustomNpc npc) {
+                if (NeoForge.EVENT_BUS.post(new NpcEvent.Spawn(npc)).isCanceled()) {
+                    event.setCanceled(true);
+                    return;
+                }
                 if (!npc.level().isClientSide && npc.mind == null && npc.getNpcAI().isEnabled()) {
                     npc.initMind();
                 }
-                NeoForge.EVENT_BUS.post(new NpcEvent.Spawn(npc));
+                npc.triggerNpcFlow("spawn", null);
             }
         }
 
@@ -764,6 +816,7 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
         public static void killed(LivingDeathEvent event) {
             DamageSource source = event.getSource();
             if (source.getEntity() instanceof CustomNpc npc) {
+                npc.triggerNpcFlow("killed", event.getEntity());
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.Killed(npc, event.getEntity(), source)).isCanceled()) {
                     event.setCanceled(true);
                 }
@@ -803,6 +856,9 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
                 setLootTableKeys(server);
                 server.getPlayerList().getPlayers().forEach(EventHandler::sendLootTableKeys);
             } else sendLootTableKeys(event.getPlayer());
+            if (event.getPlayer() == null) {
+                event.getPlayerList().getPlayers().forEach(EventHandler::sendAiDescriptors);
+            } else sendAiDescriptors(event.getPlayer());
         }
 
         @SubscribeEvent
@@ -816,7 +872,15 @@ public class CustomNpc extends PathfinderMob implements CrossbowAttackMob {
 
         private static void sendLootTableKeys(ServerPlayer player) {
             if (player.server.getPlayerList().isOp(player.getGameProfile()))
-                RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_LOOT_TABLES, lootTableKeys);
+                RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_LOOT_TABLES,
+                        S2CPayload.encodeStrings(lootTableKeys));
+        }
+
+        private static void sendAiDescriptors(ServerPlayer player) {
+            if (player.server.getPlayerList().isOp(player.getGameProfile())) {
+                RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_NPC_AI_DESCRIPTORS,
+                        NpcFlowExtensionRegistry.descriptors());
+            }
         }
     }
 }

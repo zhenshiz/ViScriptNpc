@@ -27,7 +27,6 @@ public class NpcEditorClientEvents {
     private static double worldMousePressX;
     private static double worldMousePressY;
     private static boolean worldMouseDragging;
-    private static boolean pathToggleKeyDown;
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
@@ -62,16 +61,6 @@ public class NpcEditorClientEvents {
         if (!ViScriptNpcClientUtil.isNpcEditorScreen(event.getScreen())) {
             return;
         }
-        if (ViScriptNpcClientUtil.isNpcAiWorldInteractionMode()
-                && event.getKeyCode() == GLFW.GLFW_KEY_P
-                && isF3Down()) {
-            if (!pathToggleKeyDown) {
-                ViScriptNpcClientUtil.toggleNpcAiWorldPathVisible();
-                pathToggleKeyDown = true;
-            }
-            event.setCanceled(true);
-            return;
-        }
         if (event.getKeyCode() == GLFW.GLFW_KEY_GRAVE_ACCENT) {
             ViScriptNpcClientUtil.toggleNpcAiWorldInteractionMode();
             event.setCanceled(true);
@@ -86,13 +75,6 @@ public class NpcEditorClientEvents {
         if (ViScriptNpcClientUtil.shouldForwardNpcAiWorldInput(event.getScreen())
                 && ViScriptNpcClientUtil.selectNpcAiWorldHotbarSlot(event.getKeyCode(), event.getScanCode())) {
             event.setCanceled(true);
-        }
-    }
-
-    @SubscribeEvent
-    public static void onScreenKeyReleased(ScreenEvent.KeyReleased.Pre event) {
-        if (event.getKeyCode() == GLFW.GLFW_KEY_P || event.getKeyCode() == GLFW.GLFW_KEY_F3) {
-            pathToggleKeyDown = false;
         }
     }
 
@@ -237,11 +219,6 @@ public class NpcEditorClientEvents {
 
     private static boolean shouldForwardToWorld(Screen screen, double mouseX, double mouseY) {
         return ViScriptNpcClientUtil.shouldForwardNpcAiWorldInput(screen, mouseX, mouseY);
-    }
-
-    private static boolean isF3Down() {
-        long window = Minecraft.getInstance().getWindow().getWindow();
-        return GLFW.glfwGetKey(window, GLFW.GLFW_KEY_F3) == GLFW.GLFW_PRESS;
     }
 
     private static void releaseWorldInputs() {
