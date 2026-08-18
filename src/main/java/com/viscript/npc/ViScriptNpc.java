@@ -7,7 +7,6 @@ import com.lowdragmc.lowdraglib2.gui.ui.ModularUI;
 import com.lowdragmc.lowdraglib2.gui.ui.UI;
 import com.lowdragmc.lowdraglib2.utils.ReflectionUtils;
 import com.mojang.logging.LogUtils;
-import com.viscript.npc.test.NpcSerializationGameTests;
 import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.npc.NpcAttachmentType;
 import com.viscript.npc.npc.NpcRegister;
@@ -35,7 +34,6 @@ public class ViScriptNpc {
         NpcAttackIntentions.register(AttentionMind.intentionTypes());
         NpcRegister.ENTITY_TYPES.register(modEventBus);
         NpcAttachmentType.ATTACHMENT_TYPES.register(modEventBus);
-        modEventBus.addListener(NpcSerializationGameTests::register);
         PlayerUIMenuType.register(NpcEditor.EDITOR_ID, ignored -> player -> {
             if (player.level().isClientSide) {
                 ModularUI modularUI = new ModularUI(UI.of(EditorWindow.open(NpcEditor.EDITOR_ID, NpcEditor::new)))
