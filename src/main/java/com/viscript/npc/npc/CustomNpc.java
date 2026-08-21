@@ -50,7 +50,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
@@ -117,8 +116,6 @@ public class CustomNpc extends PathfinderMob {
     public float bob;
     @Nullable
     private Quaternionf previewCameraOrientation;
-    @Nullable
-    private Vec3 commandPathTestTarget;
 
     public CustomNpc(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
@@ -156,9 +153,6 @@ public class CustomNpc extends PathfinderMob {
         super.tick();
         if (!level().isClientSide()) {
             NeoForge.EVENT_BUS.post(new NpcEvent.Tick(this));
-            if (tickCommandPathTestOverride()) {
-                return;
-            }
             if (mind != null) {
                 if (flowRuntime != null) flowRuntime.tick();
                 if (flowRuntime != null && flowRuntime.isPaused()) mind.pause();
@@ -174,36 +168,6 @@ public class CustomNpc extends PathfinderMob {
             } catch (Exception ignored) {
             }
         }
-    }
-
-    public boolean startCommandPathTest(Path path, Vec3 target, double speed) {
-        commandPathTestTarget = target;
-        getNavigation().stop();
-        boolean moving = getNavigation().moveTo(path, speed);
-        if (!moving) {
-            commandPathTestTarget = null;
-        }
-        return moving;
-    }
-
-    public void stopCommandPathTest() {
-        commandPathTestTarget = null;
-        getNavigation().stop();
-    }
-
-    public boolean isCommandPathTestActive() {
-        return commandPathTestTarget != null;
-    }
-
-    private boolean tickCommandPathTestOverride() {
-        if (commandPathTestTarget == null) {
-            return false;
-        }
-        if (!isAlive() || getNavigation().isDone() || distanceToSqr(commandPathTestTarget) <= 2.25D) {
-            stopCommandPathTest();
-            return false;
-        }
-        return true;
     }
 
     @Override

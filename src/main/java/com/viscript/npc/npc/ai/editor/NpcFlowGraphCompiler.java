@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Compiles the editor graph into the server-side sequential flow format. */
+/** 将编辑器图编译为服务端使用的顺序流程格式。 */
 public final class NpcFlowGraphCompiler {
     private NpcFlowGraphCompiler() {
     }
@@ -61,7 +61,7 @@ public final class NpcFlowGraphCompiler {
             }
         }
         if (!errors.isEmpty()) {
-            // Invalid updates are fail-closed: diagnostics remain visible, but no partial rules execute.
+            // 无效更新采用安全失败策略：保留诊断信息，但不执行不完整的规则。
             rules.clear();
             result.put("errors", errors);
         }
@@ -83,7 +83,7 @@ public final class NpcFlowGraphCompiler {
                 type = "branch";
                 output = FlowNode.PORT_CHILDREN;
             } else if (node instanceof FlowNodes.Case) {
-                // A case is a guarded sequential branch. Branch selection evaluates its options.
+                // 条件分支是带保护条件的顺序分支，选择分支时会计算其选项。
                 type = "sequence";
                 output = FlowNode.PORT_CHILDREN;
                 excluded = Set.of("parameters_json");

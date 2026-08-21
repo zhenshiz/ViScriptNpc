@@ -6,7 +6,7 @@ import net.minecraft.nbt.Tag;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/** Client-populated copy of the server-authoritative AI editor descriptors. */
+/** 客户端保存的服务端权威 AI 编辑器描述信息副本。 */
 public final class NpcAiDescriptorCache {
     private static CompoundTag descriptors = new CompoundTag();
 

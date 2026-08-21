@@ -10,10 +10,6 @@
   "client": [
     "GeoRendererMixin",
     "LivingEntityRenderMixin",
-    "MinecraftInteractionAccessor",
-    "MouseHandlerAccessor",
-    "NpcAiWorldCameraMixin",
-    "NpcEditorContainerScreenMixin",
     "WorldSceneRendererAccessor"
   ],
   "injectors": {

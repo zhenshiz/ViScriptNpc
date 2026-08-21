@@ -54,7 +54,7 @@ public class NPCPreviewView extends View implements INpcEditorSlotView {
     @Setter
     private boolean cullBoxVisible = false;
 
-    //runtime
+    // 运行时状态
     private boolean isSceneLoaded = false;
 
     public NPCPreviewView(NpcEditor editor) {
@@ -248,9 +248,9 @@ public class NPCPreviewView extends View implements INpcEditorSlotView {
 
         public void initGizmos() {
             var toggleGroup = new Toggle.ToggleGroup();
-            // translate
+            // 平移
             gizmoBar.addChild(createTransformToggle(toggleGroup, Mode.TRANSLATE, Icons.TRANSFORM_TRANSLATE));
-            // scale
+            // 缩放
             gizmoBar.addChild(createTransformToggle(toggleGroup, Mode.SCALE, Icons.TRANSFORM_SCALE));
         }
 

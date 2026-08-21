@@ -40,7 +40,7 @@ import org.thexeler.api.world.MindEntityActor;
 import org.thexeler.api.world.MindMoveControl;
 import org.thexeler.api.world.MindPosition;
 
-/** Minecraft/NeoForge capability adapter used as the sole AM actor for a CustomNpc. */
+/** Minecraft/NeoForge 能力适配器，作为 CustomNpc 唯一的 AM 执行对象。 */
 public final class NpcMindActor extends AbstractLivingMindActor<CustomNpc>
         implements MovableCapability, TargetResolverCapability, CombatCapability, DamageableCapability,
         EntityInteractionCapability, BlockInteractionCapability, ItemInteractionCapability {
@@ -143,7 +143,7 @@ public final class NpcMindActor extends AbstractLivingMindActor<CustomNpc>
 
     @Override
     public void holdTask(String taskId) {
-        // Attack cooldown tasks do not own an external animation or asynchronous resource.
+        // 攻击冷却任务不持有外部动画或异步资源。
     }
 
     @Override

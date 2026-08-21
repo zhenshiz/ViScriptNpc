@@ -10,12 +10,17 @@ import com.lowdragmc.lowdraglib2.gui.texture.SpriteTexture;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.Tab;
 import com.lowdragmc.lowdraglib2.gui.ui.event.UIEvents;
+import com.lowdragmc.lowdraglib2.networking.rpc.RPCPacketDistributor;
 import com.mojang.blaze3d.MethodsReturnNonnullByDefault;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.ViScriptNpcRegistries;
 import com.viscript.npc.gui.edit.page.INpcEditorPage;
 import com.viscript.npc.gui.edit.view.*;
+import com.viscript.npc.gui.test.NpcAiTestSceneView;
+import com.viscript.npc.gui.test.NpcTestSceneProject;
+import com.viscript.npc.network.c2s.C2SPayload;
 import com.viscript.npc.npc.ai.editor.AMIntentionGraphView;
+import com.viscript.npc.npc.ai.test.NpcAiTestEnvironment;
 import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
 import com.viscript.npc.util.AMIntentionServerUploads;
 import com.viscript.npc.util.ViScriptNpcClientUtil;
@@ -23,6 +28,7 @@ import com.viscript_lib.gui.editor.*;
 import dev.vfyjxf.taffy.style.AlignItems;
 import dev.vfyjxf.taffy.style.FlexDirection;
 import lombok.Getter;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -63,14 +69,15 @@ public class NpcEditor extends ProjectFileEditor {
     private int lastProjectTabCount = -1;
     private float lastProjectTabAvailableWidth = -1.0f;
     private boolean lastProjectPageBarOffset;
-    private boolean npcAiWorldTestCollapsedRightWindow;
-    private boolean npcAiWorldTestRightWasCollapsed;
     @Nullable
     private AMIntentionGraphView amIntentionGraphView;
+    @Nullable
+    private NpcAiTestSceneView npcTestSceneView;
 
     public NpcEditor() {
         registerProjectType(NPCProject.PROVIDER);
         registerProjectType(AMIntentionProject.PROVIDER);
+        registerProjectType(NpcTestSceneProject.PROVIDER);
         this.icon.style(style -> style.backgroundTexture(ICON));
         detachDefaultInspectorView();
         initNpcEditorPageBar();
@@ -106,6 +113,18 @@ public class NpcEditor extends ProjectFileEditor {
                             format, fileName, project.serializeNBT(Platform.getFrozenRegistry()))
             );
         }
+        if (getCurrentProject() instanceof NpcTestSceneProject project) {
+            EditorFileFormat format = NpcTestSceneProject.FORMAT;
+            return new NpcUploadAction(
+                    "viscript_lib.editor.menu.upload_project_file",
+                    "viscript_lib.editor.dialog.upload_project_file",
+                    testSceneBaseName(),
+                    format.projectSuffix(),
+                    fileName -> EditorFileNames.normalizeFileName(fileName, format.projectSuffix()),
+                    fileName -> EditorServerUploads.uploadProjectToServer(
+                            format, fileName, project.serializeNBT(Platform.getFrozenRegistry()))
+            );
+        }
         return null;
     }
 
@@ -131,6 +150,18 @@ public class NpcEditor extends ProjectFileEditor {
                     NpcEditor::normalizeAmAssetId,
                     fileName -> AMIntentionServerUploads.upload(
                             ResourceLocation.parse(normalizeAmAssetId(fileName)), project.compile())
+            );
+        }
+        if (getCurrentProject() instanceof NpcTestSceneProject project) {
+            EditorFileFormat format = NpcTestSceneProject.FORMAT;
+            return new NpcUploadAction(
+                    "viscript_lib.editor.menu.upload_runtime_file",
+                    "viscript_lib.editor.dialog.upload_runtime_file",
+                    testSceneBaseName(),
+                    format.runtimeSuffix(),
+                    fileName -> EditorFileNames.normalizeFileName(fileName, format.runtimeSuffix()),
+                    fileName -> EditorServerUploads.uploadToServer(
+                            format, fileName, project.serializeRuntimeFile(Platform.getFrozenRegistry()))
             );
         }
         return null;
@@ -169,6 +200,23 @@ public class NpcEditor extends ProjectFileEditor {
                     }
             );
         }
+        if (getCurrentProject() instanceof NpcTestSceneProject project) {
+            EditorFileFormat format = NpcTestSceneProject.FORMAT;
+            return new NpcUploadAction(
+                    "viscript_lib.editor.menu.upload_project_and_runtime_file",
+                    "viscript_lib.editor.dialog.upload_project_and_runtime_file",
+                    testSceneBaseName(),
+                    "",
+                    fileName -> EditorFileNames.normalizeBaseName(
+                            fileName, format.projectSuffix(), format.runtimeSuffix()),
+                    fileName -> {
+                        EditorServerUploads.uploadProjectToServer(
+                                format, fileName, project.serializeNBT(Platform.getFrozenRegistry()));
+                        EditorServerUploads.uploadToServer(
+                                format, fileName, project.serializeRuntimeFile(Platform.getFrozenRegistry()));
+                    }
+            );
+        }
         return null;
     }
 
@@ -184,6 +232,7 @@ public class NpcEditor extends ProjectFileEditor {
     protected void loadNewProject(IProject project, @Nullable File projectFile) {
         if (project instanceof NPCProject npcProject) {
             clearAmIntentionProjectView();
+            clearNpcTestSceneView();
             untitledProjectIndex = projectFile == null ? NEXT_UNTITLED_PROJECT_INDEX++ : 0;
             super.loadNewProject(project, projectFile);
             ViScriptNpcClientUtil.cacheNpcProject = npcProject;
@@ -192,6 +241,7 @@ public class NpcEditor extends ProjectFileEditor {
         } else if (project instanceof AMIntentionProject amProject) {
             clearNpcEditorPages();
             clearAmIntentionProjectView();
+            clearNpcTestSceneView();
             untitledProjectIndex = projectFile == null ? NEXT_UNTITLED_PROJECT_INDEX++ : 0;
             super.loadNewProject(project, projectFile);
             amIntentionGraphView = new AMIntentionGraphView(amProject);
@@ -203,13 +253,43 @@ public class NpcEditor extends ProjectFileEditor {
             setRightWindowVisible(true);
             setBottomWindowVisible(true);
             refreshProjectTabs(true);
+        } else if (project instanceof NpcTestSceneProject testSceneProject) {
+            if (requestNewTestArena(testSceneProject)) {
+                return;
+            }
+            clearNpcEditorPages();
+            clearAmIntentionProjectView();
+            clearNpcTestSceneView();
+            untitledProjectIndex = projectFile == null ? NEXT_UNTITLED_PROJECT_INDEX++ : 0;
+            super.loadNewProject(project, projectFile);
+            npcTestSceneView = new NpcAiTestSceneView(testSceneProject);
+            applyBasicSlotView(centerWindow.getLeftTop(), npcTestSceneView);
+            applyBasicSlotView(rightWindow.getRightTop(), npcTestSceneView.getInspectorView());
+            applyBasicSlotView(bottomWindow.getLeftBottom(), npcTestSceneView.getToolboxView());
+            applyBasicSlotView(leftWindow.getLeftTop(), null);
+            setLeftWindowVisible(false);
+            setRightWindowVisible(true);
+            setBottomWindowVisible(true);
+            refreshProjectTabs(true);
         }
+    }
+
+    private static boolean requestNewTestArena(NpcTestSceneProject project) {
+        if (project.hasRuntimeArenaCenter()
+                || !NpcAiTestEnvironment.isTestLevel(Minecraft.getInstance().level)) {
+            return false;
+        }
+        RPCPacketDistributor.rpcToServer(
+                C2SPayload.CREATE_NPC_AI_TEST_ARENA,
+                project.serializeNBT(Platform.getFrozenRegistry()));
+        return true;
     }
 
     @Override
     protected void closeCurrentProject() {
         super.closeCurrentProject();
         clearAmIntentionProjectView();
+        clearNpcTestSceneView();
         npcInspectorView.clear();
         clearNpcEditorPages();
         refreshProjectTabs(true);
@@ -222,6 +302,9 @@ public class NpcEditor extends ProjectFileEditor {
         }
         if (getCurrentProject() instanceof AMIntentionProject project) {
             return Component.literal(amProjectBaseName(project));
+        }
+        if (getCurrentProject() instanceof NpcTestSceneProject) {
+            return Component.literal(testSceneTabTitle());
         }
         return super.getTitle();
     }
@@ -238,6 +321,25 @@ public class NpcEditor extends ProjectFileEditor {
                     AMIntentionProject.FORMAT.projectSuffix(), AMIntentionProject.FORMAT.runtimeSuffix());
         }
         return amAssetId(project).toString();
+    }
+
+    private String testSceneTabTitle() {
+        String baseName = testSceneBaseName();
+        EditorWindow window = getWindow();
+        if (getCurrentProjectFile() == null && untitledProjectIndex > 0
+                && window != null && window.hasMultipleEditors()) {
+            return baseName + " #" + untitledProjectIndex;
+        }
+        return baseName;
+    }
+
+    private String testSceneBaseName() {
+        File projectFile = getCurrentProjectFile();
+        if (projectFile != null) {
+            return EditorFileNames.normalizeBaseName(projectFile.getName(),
+                    NpcTestSceneProject.FORMAT.projectSuffix(), NpcTestSceneProject.FORMAT.runtimeSuffix());
+        }
+        return Component.translatable("editor.project.npc_test_scene.add").getString();
     }
 
     private static String normalizeAmAssetId(String value) {
@@ -297,30 +399,6 @@ public class NpcEditor extends ProjectFileEditor {
         setLeftWindowVisible(leftView != null);
         setRightWindowVisible(rightView != null);
         setBottomWindowVisible(bottomView != null);
-    }
-
-    public void applyNpcAiWorldTestLayout() {
-        ViewContainer rightContainer = rightWindow.getRightTop();
-        npcAiWorldTestRightWasCollapsed = rightContainer.isCollapse();
-        npcAiWorldTestCollapsedRightWindow = true;
-        setRightWindowVisible(true);
-        if (!rightContainer.isCollapse()) {
-            rightContainer.collapse();
-        }
-    }
-
-    public void restoreSelectedNpcEditorPageLayout() {
-        if (selectedNpcEditorPage != null && getCurrentProject() instanceof NPCProject npcProject) {
-            applyPageLayout(selectedNpcEditorPage, npcProject);
-        }
-        if (npcAiWorldTestCollapsedRightWindow) {
-            ViewContainer rightContainer = rightWindow.getRightTop();
-            if (!npcAiWorldTestRightWasCollapsed) {
-                rightContainer.expand();
-            }
-            npcAiWorldTestCollapsedRightWindow = false;
-            npcAiWorldTestRightWasCollapsed = false;
-        }
     }
 
     private void loadNpcEditorPages() {
@@ -459,6 +537,7 @@ public class NpcEditor extends ProjectFileEditor {
 
     private Tab createNpcEditorPageTab(INpcEditorPage page) {
         Tab tab = new Tab().setText(page.displayName());
+        tab.setId("npc_editor_page_tab_" + page.pageId().getPath().replace('/', '_'));
         tab.getLayout().paddingHorizontal(5);
         tab.addEventListener(UIEvents.MOUSE_DOWN, event -> {
             if (event.button == 0) {
@@ -539,6 +618,19 @@ public class NpcEditor extends ProjectFileEditor {
         if (amIntentionGraphView.hasParent()) amIntentionGraphView.removeSelf();
         viewFallbacks.remove(amIntentionGraphView);
         amIntentionGraphView = null;
+    }
+
+    private void clearNpcTestSceneView() {
+        if (npcTestSceneView == null) return;
+        View inspectorView = npcTestSceneView.getInspectorView();
+        if (inspectorView.hasParent()) inspectorView.removeSelf();
+        viewFallbacks.remove(inspectorView);
+        View toolboxView = npcTestSceneView.getToolboxView();
+        if (toolboxView.hasParent()) toolboxView.removeSelf();
+        viewFallbacks.remove(toolboxView);
+        if (npcTestSceneView.hasParent()) npcTestSceneView.removeSelf();
+        viewFallbacks.remove(npcTestSceneView);
+        npcTestSceneView = null;
     }
 
     private void applyBasicSlotView(ViewContainer container, @Nullable View targetView) {

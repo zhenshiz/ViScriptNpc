@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/** Sequential outer-flow executor. A branch selects exactly one child and never forks execution. */
+/** 顺序执行外层流程；每个分支只选择一个子节点，并且不会复制执行流。 */
 public final class NpcFlowRuntime {
     private static final int MAX_NODE_STEPS_PER_TICK = 64;
     private static final int MAX_ACTIVE_RULES = 32;

@@ -7,7 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
-/** Client-side projection of the latest authoritative AI debug snapshot. */
+/** 客户端对最新权威 AI 调试快照的投影。 */
 public final class NpcAiDebugClientState {
     private static Set<UUID> currentNodes = Set.of();
     private static Set<UUID> breakpoints = Set.of();

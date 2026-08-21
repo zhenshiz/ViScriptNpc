@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-/** VSN-owned, strongly typed attack intentions for AM assets and flow submissions. */
+/** 由 VSN 持有的强类型攻击意图，用于 AM 资源和流程提交。 */
 public final class NpcAttackIntentions {
     public static final ResourceLocation MELEE = ViScriptNpc.id("melee_attack");
     public static final ResourceLocation RANGED = ViScriptNpc.id("ranged_attack");

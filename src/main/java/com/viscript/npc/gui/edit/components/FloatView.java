@@ -19,7 +19,7 @@ public class FloatView extends UIElement {
     public final UIElement titleBar;
     public final UIElement contentContainer;
 
-    //runtime
+    // 运行时状态
     @Getter
     private boolean isHidden;
 
