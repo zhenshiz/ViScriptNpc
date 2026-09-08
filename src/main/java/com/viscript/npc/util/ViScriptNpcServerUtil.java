@@ -18,26 +18,49 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import org.thexeler.MindMachine;
-import org.thexeler.api.IntentionFunctionRegistries;
+import org.thexeler.AttentionMind;
 import org.thexeler.api.IntentionPriority;
+import org.thexeler.api.SubmissionResult;
+import org.thexeler.api.script.ScriptIntentionDefinition;
 import org.thexeler.api.world.MindActor;
 import org.thexeler.api.world.MindEntityActor;
-import org.thexeler.api.world.MindPosition;
-import org.thexeler.intention.BaseIntention;
-import org.thexeler.intention.base.IdleIntention;
-import org.thexeler.intention.base.MoveIntention;
-import org.thexeler.intention.target.FollowIntention;
-import org.thexeler.intention.target.MeleeAttackIntention;
+import com.viscript.npc.npc.ai.flow.NpcFlowExtensionRegistry;
+import com.viscript.npc.npc.ai.flow.NpcAiDependencyIndex;
+import com.viscript.npc.npc.ai.flow.NpcFlowTemplateRegistry;
+import com.viscript.npc.npc.ai.flow.NpcIntentionDependencyGraph;
+import net.minecraft.resources.ResourceLocation;
 
-import java.util.function.Consumer;
-import java.util.function.Predicate;
+import java.util.Collection;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class ViScriptNpcServerUtil {
+    private static final List<ScriptIntentionDefinition> PENDING_SCRIPT_INTENTIONS = new ArrayList<>();
+    private static Map<ResourceLocation, String> activeScriptFingerprints = Map.of();
+    private static Map<ResourceLocation, String> preReloadFlowExtensionFingerprints = Map.of();
+    private static boolean collectingScriptReload;
 
     @Info("服务端打开NPC编辑器")
     public static void openNpcEditor(ServerPlayer player, CompoundTag tag) {
         PlayerUIMenuType.openUI(player, NpcEditor.EDITOR_ID);
         RPCPacketDistributor.rpcToPlayer(player, S2CPayload.OPEN_NPC_EDITOR, tag);
+        sendNpcAiDescriptors(player);
+    }
+
+    public static void sendNpcAiDescriptors(ServerPlayer player) {
+        if (player != null) {
+            RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_NPC_AI_DESCRIPTORS,
+                    NpcFlowExtensionRegistry.descriptors());
+        }
+    }
+
+    public static void broadcastNpcAiDescriptors(net.minecraft.server.MinecraftServer server) {
+        if (server == null) return;
+        CompoundTag descriptors = NpcFlowExtensionRegistry.descriptors();
+        server.getPlayerList().getPlayers().forEach(player -> RPCPacketDistributor.rpcToPlayer(player,
+                S2CPayload.SEND_NPC_AI_DESCRIPTORS, descriptors));
     }
 
     @Info("生成NPC")
@@ -59,44 +82,107 @@ public class ViScriptNpcServerUtil {
         return npc.getMind();
     }
 
-    @Info("向 NPC 添加 Intention")
-    public static void addIntention(CustomNpc npc, IntentionPriority priority, BaseIntention intention) {
+    @Info("按注册 ID 和强类型参数向 NPC 提交 Intention")
+    public static SubmissionResult submitIntention(CustomNpc npc, String intentionId,
+                                                    IntentionPriority priority, Map<String, ?> parameters) {
         MindMachine mind = npc.getMind();
-        if (mind != null) mind.addIntention(priority, intention);
+        if (mind == null) {
+            return new SubmissionResult.Rejected(java.util.List.of(
+                    new org.thexeler.api.IntentionDiagnostic("MIND_UNAVAILABLE", "NPC mind is not available")));
+        }
+        return mind.submit(net.minecraft.resources.ResourceLocation.parse(intentionId), priority, parameters);
     }
 
-    @Info("注册可被 CustomIntention 引用的 execute 函数（返回 true 表示执行完毕）")
-    public static void registerExecuteFunction(String id, Predicate<BaseIntention> function) {
-        IntentionFunctionRegistries.registerExecuteFunction(net.minecraft.resources.ResourceLocation.parse(id), function);
+    @Info("在 KubeJS/server reload 时原子替换脚本意图描述")
+    public static synchronized void replaceScriptIntentions(Collection<ScriptIntentionDefinition> definitions) {
+        if (collectingScriptReload) {
+            PENDING_SCRIPT_INTENTIONS.clear();
+            PENDING_SCRIPT_INTENTIONS.addAll(definitions);
+        } else {
+            applyScriptIntentions(List.copyOf(definitions));
+        }
     }
 
-    @Info("注册可被 CustomIntention 引用的 hold 函数")
-    public static void registerHoldFunction(String id, Consumer<BaseIntention> function) {
-        IntentionFunctionRegistries.registerHoldFunction(net.minecraft.resources.ResourceLocation.parse(id), function);
+    public static synchronized void beginScriptReload() {
+        collectingScriptReload = true;
+        PENDING_SCRIPT_INTENTIONS.clear();
+        preReloadFlowExtensionFingerprints = NpcFlowExtensionRegistry.fingerprints();
+        NpcFlowExtensionRegistry.clearScriptExtensions();
     }
 
-    @Info("构造 IdleIntention")
-    public static IdleIntention idle(MindMachine machine, MindActor self) {
-        return new IdleIntention(machine, self);
+    public static synchronized void finishScriptReload() {
+        List<ScriptIntentionDefinition> definitions = List.copyOf(PENDING_SCRIPT_INTENTIONS);
+        try {
+            applyScriptIntentions(definitions);
+        } finally {
+            PENDING_SCRIPT_INTENTIONS.clear();
+            collectingScriptReload = false;
+        }
+        var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+        Map<ResourceLocation, String> currentFlowExtensions = NpcFlowExtensionRegistry.fingerprints();
+        Set<ResourceLocation> changedFlowExtensions = new java.util.LinkedHashSet<>(
+                preReloadFlowExtensionFingerprints.keySet());
+        changedFlowExtensions.addAll(currentFlowExtensions.keySet());
+        preReloadFlowExtensionFingerprints = Map.of();
+        if (!changedFlowExtensions.isEmpty() && server != null) {
+            Set<ResourceLocation> affected = new java.util.LinkedHashSet<>(changedFlowExtensions);
+            affected.addAll(NpcFlowTemplateRegistry.getInstance().refreshResolvedHashes());
+            NpcAiDependencyIndex.resetAffected(server, affected);
+        }
+        broadcastNpcAiDescriptors(server);
     }
 
-    @Info("构造 MoveIntention")
-    public static MoveIntention move(MindMachine machine, MindActor self, MindPosition pos) {
-        return new MoveIntention(machine, self, pos);
+    private static void applyScriptIntentions(List<ScriptIntentionDefinition> definitions) {
+        Set<ResourceLocation> ids = new java.util.LinkedHashSet<>(activeScriptFingerprints.keySet());
+        definitions.forEach(definition -> ids.add(definition.id()));
+        AttentionMind.replaceScriptIntentions(definitions);
+        Map<ResourceLocation, String> next = new java.util.LinkedHashMap<>();
+        definitions.forEach(definition -> next.put(definition.id(),
+                NpcIntentionDependencyGraph.fingerprint(definition.id())));
+        Set<ResourceLocation> directlyChanged = new java.util.LinkedHashSet<>();
+        ids.forEach(id -> {
+            if (!java.util.Objects.equals(activeScriptFingerprints.get(id), next.get(id))) directlyChanged.add(id);
+        });
+        activeScriptFingerprints = Map.copyOf(next);
+        if (directlyChanged.isEmpty()) return;
+        Set<ResourceLocation> changed = new java.util.LinkedHashSet<>(
+                NpcIntentionDependencyGraph.affectedAssets(directlyChanged));
+        changed.addAll(NpcFlowTemplateRegistry.getInstance().refreshResolvedHashes());
+        var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+        if (server != null) NpcAiDependencyIndex.resetAffected(server, changed);
     }
 
-    @Info("构造 FollowIntention（默认距离 0 表示贴脸跟随）")
-    public static FollowIntention follow(MindMachine machine, MindActor self, MindActor target) {
-        return new FollowIntention(machine, self, target);
+    @Info("清空上一次 server reload 注册的流程扩展")
+    public static void clearFlowExtensions() {
+        NpcFlowExtensionRegistry.clearScriptExtensions();
     }
 
-    @Info("构造 FollowIntention 并指定保持距离")
-    public static FollowIntention follow(MindMachine machine, MindActor self, MindActor target, double distance) {
-        return new FollowIntention(machine, self, target, distance);
+    @Info("注册服务端权威的自定义流程触发器描述")
+    public static void registerFlowTrigger(String id, CompoundTag parameters, CompoundTag display) {
+        NpcFlowExtensionRegistry.registerTrigger(id, parameters, display);
     }
 
-    @Info("构造 MeleeAttackIntention")
-    public static MeleeAttackIntention meleeAttack(MindMachine machine, MindActor self, MindActor target) {
-        return new MeleeAttackIntention(machine, self, target);
+    @Info("注册带能力和版本描述的服务端权威自定义流程触发器")
+    public static void registerFlowTrigger(String id, CompoundTag parameters, List<String> capabilities,
+                                           CompoundTag display, int schemaVersion) {
+        NpcFlowExtensionRegistry.registerTrigger(id, parameters, capabilities, display, schemaVersion);
+    }
+
+    @Info("注册服务端权威的自定义流程条件")
+    public static void registerFlowCondition(String id, CompoundTag parameters, CompoundTag display,
+                                             NpcFlowExtensionRegistry.FlowCondition condition) {
+        NpcFlowExtensionRegistry.registerCondition(id, parameters, display, condition);
+    }
+
+    @Info("注册带能力和版本描述的服务端权威自定义流程条件")
+    public static void registerFlowCondition(String id, CompoundTag parameters, List<String> capabilities,
+                                             CompoundTag display, int schemaVersion,
+                                             NpcFlowExtensionRegistry.FlowCondition condition) {
+        NpcFlowExtensionRegistry.registerCondition(id, parameters, capabilities, display, schemaVersion, condition);
+    }
+
+    @Info("触发 NPC 的自定义外层流程")
+    public static void triggerFlow(CustomNpc npc, String trigger, LivingEntity target) {
+        npc.triggerNpcFlow(trigger, target);
     }
 }

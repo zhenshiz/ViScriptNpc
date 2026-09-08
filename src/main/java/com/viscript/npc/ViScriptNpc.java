@@ -10,7 +10,7 @@ import com.mojang.logging.LogUtils;
 import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.npc.NpcAttachmentType;
 import com.viscript.npc.npc.NpcRegister;
-import com.viscript.npc.npc.data.ai.runtime.NpcBehaviorDataSerializers;
+import com.viscript.npc.npc.ai.NpcAttackIntentions;
 import com.viscript.npc.plugin.IViScriptNpcPlugin;
 import com.viscript.npc.plugin.ViScriptNpcPlugin;
 import net.minecraft.client.Minecraft;
@@ -21,6 +21,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import org.slf4j.Logger;
+import org.thexeler.AttentionMind;
 
 import java.util.function.Consumer;
 
@@ -30,7 +31,7 @@ public class ViScriptNpc {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public ViScriptNpc(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
-        NpcBehaviorDataSerializers.register();
+        NpcAttackIntentions.register(AttentionMind.intentionTypes());
         NpcRegister.ENTITY_TYPES.register(modEventBus);
         NpcAttachmentType.ATTACHMENT_TYPES.register(modEventBus);
         PlayerUIMenuType.register(NpcEditor.EDITOR_ID, ignored -> player -> {

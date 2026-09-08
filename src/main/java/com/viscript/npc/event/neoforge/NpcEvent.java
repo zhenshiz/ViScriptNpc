@@ -14,7 +14,7 @@ import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 
 /**
  * Npc事件(纯服务端事件)
- * 支持npc在创建，死亡，交互，受伤，tick，击杀，攻击，切换攻击对象时触发自定义内容
+ * 支持 NPC 在创建、死亡、交互、受伤、游戏刻、击杀、攻击和切换攻击对象时触发自定义内容
  */
 @Getter
 public abstract class NpcEvent extends Event {

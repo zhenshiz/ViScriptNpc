@@ -36,7 +36,7 @@ public class RenderUtil {
         return minecraft.getWindow().getGuiScaledHeight();
     }
 
-    //fill
+    // 填充
 
     //矩形
     @Info("""
@@ -431,7 +431,7 @@ public class RenderUtil {
         fillRoundRect(guiGraphics, x, y, thickness, length, thickness / 2, color);
     }
 
-    //draw
+    // 描边
 
     //矩形
     @Info("""
@@ -685,7 +685,7 @@ public class RenderUtil {
         drawRoundRect(guiGraphics, x, y, thickness, length, thickness / 2, color);
     }
 
-    // image
+    // 图片
     @Info("""
             图片
             
@@ -815,7 +815,7 @@ public class RenderUtil {
         renderItem(guiGraphics, item, x, y, scale, "");
     }
 
-    // text
+    // 文本
     @Info("""
             左对齐文本
             
@@ -905,7 +905,7 @@ public class RenderUtil {
         poseStack.scale(rescale, rescale, rescale);
     }
 
-    //cursor
+    // 光标
 
     @Info("""
             设置鼠标的位置
@@ -943,7 +943,7 @@ public class RenderUtil {
         return new Point((int) (rW * minecraft.mouseHandler.xpos()), (int) (rH * minecraft.mouseHandler.ypos()));
     }
 
-    //util
+    // 工具方法
 
     @Info("""
             设置渲染的透明度
@@ -961,7 +961,7 @@ public class RenderUtil {
         RenderSystem.disableBlend();
     }
 
-    //private
+    // 私有方法
 
     private static void drawBuffer(BufferBuilder buf) {
         BufferUploader.drawWithShader(Objects.requireNonNull(buf.build()));

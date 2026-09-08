@@ -17,10 +17,6 @@ public class NpcAttributes implements INpcData {
     @Configurable(name = "npcConfig.npcAttributes.movementSpeed")
     @ConfigNumber(range = {0, 1024}, wheel = 0.1)
     private double movementSpeed = 0.7;
-    @Configurable(name = "npcConfig.npcAttributes.meleeConfig", subConfigurable = true)
-    private MeleeConfig meleeConfig = new MeleeConfig();
-    @Configurable(name = "npcConfig.npcAttributes.rangedConfig", subConfigurable = true)
-    private RangedConfig rangedConfig = new RangedConfig();
     @Configurable(name = "npcConfig.npcAttributes.resistanceConfig", subConfigurable = true)
     private ResistanceConfig resistanceConfig = new ResistanceConfig();
     @Configurable(name = "npcConfig.npcAttributes.defenseConfig", subConfigurable = true)

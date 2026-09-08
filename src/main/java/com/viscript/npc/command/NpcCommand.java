@@ -1,13 +1,14 @@
 package com.viscript.npc.command;
 
+import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegister;
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.viscript.npc.ViScriptNpc;
-import com.viscript.npc.npc.CustomNpc;
+import com.viscript.npc.gui.test.NpcTestSceneProject;
 import com.viscript.npc.util.NpcEditorFormats;
+import com.viscript.npc.util.NpcRuntimeFiles;
 import com.viscript.npc.util.ViScriptNpcServerUtil;
 import com.viscript_lib.gui.editor.EditorAssetFiles;
 import com.viscript_lib.gui.editor.EditorFileFormat;
@@ -18,14 +19,10 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.coordinates.Vec3Argument;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.pathfinder.Path;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 import java.io.File;
@@ -35,9 +32,6 @@ import java.util.List;
 
 @LDLRegister(name = "npc", registry = ICommand.COMMAND_ID)
 public class NpcCommand implements ICommand {
-    private static final double DEFAULT_PATH_TEST_SPEED = 1.0D;
-    private static final double NEAREST_PATH_TEST_RANGE = 128.0D;
-
     @Override
     public void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext buildContext, Commands.CommandSelection commandSelection) {
         dispatcher.register(Commands.literal(ViScriptNpc.MOD_ID).requires(commandSourceStack -> commandSourceStack.hasPermission(2))
@@ -60,16 +54,13 @@ public class NpcCommand implements ICommand {
                                 })).executes(this::openEditor)
                         )
                 )
-                .then(Commands.literal("path")
-                        .then(Commands.literal("test")
-                                .then(Commands.literal("nearest")
-                                        .then(Commands.argument("pos", Vec3Argument.vec3())
-                                                .executes(context -> this.pathTestNearest(context, DEFAULT_PATH_TEST_SPEED))
-                                                .then(Commands.argument("speed", DoubleArgumentType.doubleArg(0.01D, 16.0D))
-                                                        .executes(context -> this.pathTestNearest(context, DoubleArgumentType.getDouble(context, "speed")))
-                                                )
-                                        )
-                                )
+                .then(Commands.literal("test")
+                        .executes(this::openTestScene)
+                        .then(Commands.argument("file", StringArgumentType.greedyString())
+                                .suggests(((context, builder) -> {
+                                    getServerTestSceneFiles().forEach(builder::suggest);
+                                    return builder.buildFuture();
+                                })).executes(this::openTestScene)
                         )
                 )
         );
@@ -78,34 +69,30 @@ public class NpcCommand implements ICommand {
     public static final EditorFileFormat FORMAT = NpcEditorFormats.NPC;
 
     static List<String> getServerNpcFiles() {
-        return EditorAssetFiles.listRuntimeFiles(FORMAT, true);
+        return NpcRuntimeFiles.listFileIds();
     }
 
     static List<String> getServerEditorFiles() {
         return EditorAssetFiles.listProjectFiles(FORMAT, true);
     }
 
+    static List<String> getServerTestSceneFiles() {
+        return EditorAssetFiles.listProjectFiles(NpcTestSceneProject.FORMAT, true);
+    }
+
     static File getNpcProjectFile(String fileName) {
         return EditorAssetFiles.resolveProjectFile(FORMAT, normalizeFileArgument(fileName), true).toFile();
     }
 
-    static File getNpcFile(String fileName) {
-        return EditorAssetFiles.resolveRuntimeFile(FORMAT, normalizeFileArgument(fileName), true).toFile();
+    static File getTestSceneProjectFile(String fileName) {
+        return EditorAssetFiles.resolveProjectFile(NpcTestSceneProject.FORMAT,
+                normalizeFileArgument(fileName), true).toFile();
     }
 
     private static String normalizeFileArgument(String fileName) {
         if (fileName.startsWith("\"")) fileName = fileName.substring(1);
         if (fileName.endsWith("\"")) fileName = fileName.substring(0, fileName.length() - 1);
         return fileName;
-    }
-
-    static CompoundTag readNpcFile(File file) {
-        if (!file.exists()) return new CompoundTag();
-        try (var inputStream = Files.newInputStream(file.toPath())) {
-            return NbtIo.readCompressed(inputStream, NbtAccounter.unlimitedHeap());
-        } catch (IOException e) {
-            return new CompoundTag();
-        }
     }
 
     static CompoundTag readProjectFile(File file) {
@@ -130,7 +117,8 @@ public class NpcCommand implements ICommand {
                 throw entityOnlyException();
             }
         }
-        Entity npc = ViScriptNpcServerUtil.summonNpc(readNpcFile(getNpcFile(fileName)), pos);
+        Entity npc = ViScriptNpcServerUtil.summonNpc(
+                NpcRuntimeFiles.load(normalizeFileArgument(fileName)), pos);
         if (npc != null) {
             source.sendSuccess(() -> Component.translatable("commands.summon.success", npc.getDisplayName()), true);
             return 1;
@@ -166,53 +154,33 @@ public class NpcCommand implements ICommand {
         }
     }
 
-    private int pathTestNearest(CommandContext<CommandSourceStack> context, double speed) {
+    @SneakyThrows
+    private int openTestScene(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
-        CustomNpc npc = findNearestPathTestNpc(source);
-        if (npc == null) {
-            source.sendFailure(Component.translatable("command.viscript_npc.path.no_nearest_npc", NEAREST_PATH_TEST_RANGE));
+        ServerPlayer player = source.getPlayer();
+        if (player == null) {
+            throw playerOnlyException();
+        }
+        String fileName = "";
+        try {
+            fileName = StringArgumentType.getString(context, "file");
+        } catch (Exception ignored) {
+        }
+        CompoundTag projectTag;
+        if (fileName.isEmpty()) {
+            NpcTestSceneProject project = new NpcTestSceneProject();
+            project.initNewProject();
+            projectTag = project.serializeNBT(Platform.getFrozenRegistry());
+        } else {
+            projectTag = readProjectFile(getTestSceneProjectFile(fileName));
+        }
+        if (!fileName.isEmpty() && projectTag.isEmpty()) {
+            source.sendFailure(Component.translatable(
+                    "command.viscript_npc.test_scene.project_file_required", fileName));
             return 0;
         }
-        return pathTest(source, npc, Vec3Argument.getVec3(context, "pos"), speed);
-    }
-
-    private int pathTest(CommandSourceStack source, CustomNpc npc, Vec3 target, double speed) {
-        Path path = npc.getNavigation().createPath(target.x, target.y, target.z, 1);
-        if (path == null) {
-            source.sendFailure(Component.translatable("command.viscript_npc.path.failed",
-                    npc.getDisplayName(), formatVec3(target)));
-            return 0;
-        }
-        if (!path.canReach()) {
-            source.sendFailure(Component.translatable("command.viscript_npc.path.unreachable",
-                    npc.getDisplayName(), formatVec3(target), path.getNodeCount(), formatBlockPos(path.getTarget())));
-            return 0;
-        }
-        boolean moving = npc.startCommandPathTest(path, target, speed);
-        if (!moving) {
-            source.sendFailure(Component.translatable("command.viscript_npc.path.move_failed",
-                    npc.getDisplayName(), formatVec3(target), path.getNodeCount(), path.canReach()));
-            return 0;
-        }
-        source.sendSuccess(() -> Component.translatable("command.viscript_npc.path.started",
-                npc.getDisplayName(), formatVec3(target), speed, path.getNodeCount(), path.canReach(), formatBlockPos(path.getTarget())), true);
+        ViScriptNpcServerUtil.openNpcEditor(player, projectTag);
         return 1;
     }
 
-    private CustomNpc findNearestPathTestNpc(CommandSourceStack source) {
-        ServerLevel level = source.getLevel();
-        Vec3 pos = source.getPosition();
-        AABB bounds = AABB.ofSize(pos, NEAREST_PATH_TEST_RANGE * 2.0D, NEAREST_PATH_TEST_RANGE * 2.0D, NEAREST_PATH_TEST_RANGE * 2.0D);
-        return level.getEntitiesOfClass(CustomNpc.class, bounds, CustomNpc::isAlive).stream()
-                .min((a, b) -> Double.compare(a.distanceToSqr(pos), b.distanceToSqr(pos)))
-                .orElse(null);
-    }
-
-    private static String formatVec3(Vec3 pos) {
-        return "%.2f %.2f %.2f".formatted(pos.x, pos.y, pos.z);
-    }
-
-    private static String formatBlockPos(net.minecraft.core.BlockPos pos) {
-        return "%d %d %d".formatted(pos.getX(), pos.getY(), pos.getZ());
-    }
 }
