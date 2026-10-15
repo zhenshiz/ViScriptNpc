@@ -153,6 +153,8 @@ neoForge {
     }
 }
 
+apply from: rootProject.file('gradle/ldlib2-uitest.gradle')
+
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 modAccessor {
@@ -174,8 +176,6 @@ dependencies {
         changing = true
     }
     implementation("com.zhenshiz:ViScriptTeam-neoforge-${minecraft_version}:${viscriptteam_version}")
-    implementation "org.thexeler:attention-mind:${attention_mind_version}"
-    jarJar "org.thexeler:attention-mind:${attention_mind_version}"
 
     // KubeJS
     implementation "dev.latvian.mods:rhino:${rhino_version}"

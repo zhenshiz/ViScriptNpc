@@ -8,7 +8,6 @@ import dev.latvian.mods.kubejs.event.EventGroupRegistry;
 import dev.latvian.mods.kubejs.plugin.KubeJSPlugin;
 import dev.latvian.mods.kubejs.script.BindingRegistry;
 import dev.latvian.mods.kubejs.script.ScriptType;
-import dev.latvian.mods.kubejs.script.ScriptManager;
 import net.neoforged.neoforge.common.NeoForge;
 
 public class ViScriptNpcJSPlugin implements KubeJSPlugin {
@@ -21,29 +20,5 @@ public class ViScriptNpcJSPlugin implements KubeJSPlugin {
     @Override
     public void registerEvents(EventGroupRegistry registry) {
         registry.register(ViScriptNpcEventJS.NPC_EVENT);
-    }
-
-    @Override
-    public void registerBindings(BindingRegistry bindings) {
-        ScriptType type = bindings.type();
-        if (type.equals(ScriptType.CLIENT)) {
-            bindings.add("ViScriptNpcUtil", ViScriptNpcClientUtil.class);
-        } else if (type.equals(ScriptType.SERVER)) {
-            bindings.add("ViScriptNpcUtil", ViScriptNpcServerUtil.class);
-        }
-    }
-
-    @Override
-    public void beforeScriptsLoaded(ScriptManager manager) {
-        if (manager.scriptType == ScriptType.SERVER) {
-            ViScriptNpcServerUtil.beginScriptReload();
-        }
-    }
-
-    @Override
-    public void afterScriptsLoaded(ScriptManager manager) {
-        if (manager.scriptType == ScriptType.SERVER) {
-            ViScriptNpcServerUtil.finishScriptReload();
-        }
     }
 }

@@ -10,12 +10,6 @@ import com.viscript.npc.compat.team.NpcFactionBridge;
 import com.viscript.npc.event.neoforge.NpcEvent;
 import com.viscript.npc.network.s2c.S2CPayload;
 import com.viscript.npc.npc.data.INpcData;
-import com.viscript.npc.npc.ai.NpcMindActor;
-import com.viscript.npc.npc.ai.NpcAiDebugNbt;
-import com.viscript.npc.npc.ai.flow.NpcFlowRuntime;
-import com.viscript.npc.npc.ai.flow.NpcAiDependencyIndex;
-import com.viscript.npc.npc.ai.flow.NpcFlowTemplateRegistry;
-import com.viscript.npc.npc.ai.flow.NpcFlowExtensionRegistry;
 import com.viscript.npc.npc.data.ai.NpcAI;
 import com.viscript.npc.npc.data.attributes.NpcAttributes;
 import com.viscript.npc.npc.data.attributes.ResistanceConfig;
@@ -43,8 +37,7 @@ import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
-import net.minecraft.world.entity.ai.navigation.WaterBoundPathNavigation;
+import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -62,46 +55,20 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.damagesource.DamageContainer;
 import net.neoforged.neoforge.event.OnDatapackSyncEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
-import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
 import net.neoforged.neoforge.event.entity.living.*;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
-import org.thexeler.AttentionMind;
-import org.thexeler.MindMachine;
-import org.thexeler.api.MindMachineManager;
-import org.thexeler.api.persistence.MachineLoadResult;
 
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @SuppressWarnings("deprecation")
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CustomNpc extends PathfinderMob {
-    protected final WaterBoundPathNavigation waterNavigation;
-    protected final GroundPathNavigation groundNavigation;
-    @Nullable
-    private MindMachine mind;
-    @Nullable
-    private NpcMindActor mindActor;
-    @Nullable
-    private NpcFlowRuntime flowRuntime;
-    @Nullable
-    private CompoundTag pendingMindState;
-    @Nullable
-    private CompoundTag pendingFlowState;
-    private String aiDefinitionFailure = "";
-    @Nullable
-    private CompoundTag pendingPersistentVariables;
-    private int mindConfigHash;
-    private Set<String> amDebugBreakpoints = Set.of();
-    @Nullable
-    private String amDebugBreakpointSkipNode;
     public static Set<String> lootTableKeys = Set.of();
     public static Set<String> factionIds = Set.of();
 
@@ -119,8 +86,6 @@ public class CustomNpc extends PathfinderMob {
 
     public CustomNpc(EntityType<? extends PathfinderMob> entityType, Level level) {
         super(entityType, level);
-        this.waterNavigation = new WaterBoundPathNavigation(this, level);
-        this.groundNavigation = new GroundPathNavigation(this, level);
     }
 
     public <T extends INpcData> T getNpcAttachment(Class<T> clazz) {
@@ -136,30 +101,14 @@ public class CustomNpc extends PathfinderMob {
         return previewCameraOrientation;
     }
 
-    public void updateSwimming() { // 临时的
-        if (!this.level().isClientSide) {
-            if (this.isInWater()) {
-                this.setSwimming(true);
-                setPose(Pose.SWIMMING);
-            } else {
-                this.setSwimming(false);
-                setPose(Pose.STANDING);
-            }
-        }
-    }
-
     @Override
     public void tick() {
+        if (!level().isClientSide()) {
+            updateAiState();
+        }
         super.tick();
         if (!level().isClientSide()) {
             NeoForge.EVENT_BUS.post(new NpcEvent.Tick(this));
-            if (mind != null) {
-                if (flowRuntime != null) flowRuntime.tick();
-                if (flowRuntime != null && flowRuntime.isPaused()) mind.pause();
-                applyAmDebugBreakpoint();
-                mind.tick();
-                mindActor.moveControl().tick();
-            }
         } else {
             this.moveCloak();
             Entity entity = getNpcDynamicModel().getEntity(this);
@@ -168,6 +117,53 @@ public class CustomNpc extends PathfinderMob {
             } catch (Exception ignored) {
             }
         }
+    }
+
+    private void updateAiState() {
+        NpcAI ai = getNpcAI();
+        if (!ai.isEnabled() && (!isNoAi() || !navigation.isDone() || moveControl.hasWanted())) {
+            stopNavigation();
+        }
+        setNoAi(!ai.isEnabled());
+        setNoGravity(getNpcBasicsSetting().isNoGravity());
+    }
+
+    /**
+     * 请求服务端地面寻路，使用当前世界已有的可通行路线。
+     *
+     * <p>应在服务器线程调用。返回值仅表示导航接受了路径，不能保证到达不可通行的目标。
+     * 参数无效的请求不会覆盖当前路径。
+     * 此导航不会挖掘或放置方块，也不会将破坏障碍、搭桥视为可用路线。
+     *
+     * @param target 世界坐标，三个分量均须为有限数
+     * @param speedModifier 相对于 NPC 移动速度属性的正数倍率
+     * @return 已接受路径时返回 {@code true}；客户端、AI 关闭、实体死亡或参数无效时返回 {@code false}
+     */
+    public boolean navigateTo(Vec3 target, double speedModifier) {
+        if (level().isClientSide() || !isAlive() || !getNpcAI().isEnabled()
+                || !Double.isFinite(target.x) || !Double.isFinite(target.y) || !Double.isFinite(target.z)
+                || !Double.isFinite(speedModifier) || speedModifier <= 0) {
+            return false;
+        }
+        updateAiState();
+        return navigation.moveTo(navigation.createPath(target.x, target.y, target.z, 0), speedModifier);
+    }
+
+    /**
+     * 在服务端清除路径、控制器目标和移动惯性，阻止已取消的路径继续驱动此 NPC。
+     */
+    public void stopNavigation() {
+        if (level().isClientSide()) {
+            return;
+        }
+        navigation.stop();
+        moveControl = new MoveControl(this);
+        setSpeed(0);
+        setXxa(0);
+        setYya(0);
+        setZza(0);
+        setJumping(false);
+        setDeltaMovement(Vec3.ZERO);
     }
 
     @Override
@@ -260,30 +256,7 @@ public class CustomNpc extends PathfinderMob {
                 setData(NpcAttachmentType.getAttachment(clazz), npcAttachment);
             } catch (Exception ignored) {}
         });
-        if (!level().isClientSide) {
-            pendingMindState = tag.contains("mind", net.minecraft.nbt.Tag.TAG_COMPOUND)
-                    ? tag.getCompound("mind").copy()
-                    : null;
-            pendingFlowState = tag.contains("flow_runtime", net.minecraft.nbt.Tag.TAG_COMPOUND)
-                    ? tag.getCompound("flow_runtime").copy()
-                    : null;
-            pendingPersistentVariables = null;
-            mind = null;
-            mindActor = null;
-            flowRuntime = null;
-            aiDefinitionFailure = "";
-            mindConfigHash = 0;
-        }
         updateNpcState();
-    }
-
-    @Override
-    public void addAdditionalSaveData(CompoundTag compoundTag) {
-        super.addAdditionalSaveData(compoundTag);
-        if (mind != null) {
-            compoundTag.put("mind", mind.save());
-            if (flowRuntime != null) compoundTag.put("flow_runtime", flowRuntime.save());
-        }
     }
 
     public void updateNpcState() {
@@ -306,9 +279,9 @@ public class CustomNpc extends PathfinderMob {
         this.setAttributeBaseValue(Attributes.ARMOR_TOUGHNESS, npcAttributes.getDefenseConfig().getArmorToughness());
 
         //AI
-        NpcAI npcAI = getNpcAI();
-        this.setNoAi(!npcAI.isEnabled());
-        syncMindState(npcAI);
+        if (!level().isClientSide()) {
+            updateAiState();
+        }
 
         //联动模组
         NpcFactionBridge.applyConfiguredFaction(this);
@@ -393,223 +366,8 @@ public class CustomNpc extends PathfinderMob {
         return getNpcAttachment(NpcAI.class);
     }
 
-    @Nullable
-    public MindMachine getMind() {
-        return mind;
-    }
-
-    @Nullable
-    public NpcFlowRuntime getFlowRuntime() {
-        return flowRuntime;
-    }
-
-    public void initMind() {
-        if (this.level().isClientSide || mind != null) return;
-        initMind(getNpcAI(), currentMindConfigHash(getNpcAI()));
-    }
-
-    private void initMind(NpcAI ai, int configHash) {
-        if (this.level().isClientSide || mind != null) return;
-        final NpcFlowTemplateRegistry.Resolved resolvedDefinition;
-        try {
-            resolvedDefinition = NpcFlowTemplateRegistry.getInstance().resolve(ai);
-        } catch (RuntimeException exception) {
-            aiDefinitionFailure = exception.getMessage() == null
-                    ? exception.getClass().getSimpleName() : exception.getMessage();
-            mindConfigHash = configHash;
-            ViScriptNpc.LOGGER.warn("NPC {} AI definition is invalid: {}", getUUID(), aiDefinitionFailure);
-            return;
-        }
-        String globalFailure = NpcAiDependencyIndex.definitionFailure();
-        if (!globalFailure.isEmpty()) {
-            aiDefinitionFailure = globalFailure;
-            NpcAiDependencyIndex.register(this, resolvedDefinition.dependencies());
-            mindConfigHash = configHash;
-            return;
-        }
-        aiDefinitionFailure = "";
-        mindActor = new NpcMindActor(this);
-        String savedDefinitionHash = ai.usesTemplate() ? ai.getResolvedHash() : ai.getEmbeddedDependencyHash();
-        if (pendingMindState != null && !resolvedDefinition.resolvedHash().equals(savedDefinitionHash)) {
-            ViScriptNpc.LOGGER.info("Resetting stale AI state for NPC {} ({} -> {})", getUUID(),
-                    savedDefinitionHash, resolvedDefinition.resolvedHash());
-            pendingMindState = null;
-            pendingPersistentVariables = pendingFlowState == null ? null
-                    : pendingFlowState.getCompound("variables").copy();
-            pendingFlowState = null;
-        }
-        if (pendingMindState != null) {
-            MachineLoadResult load = MindMachine.load(mindActor, pendingMindState,
-                    AttentionMind.intentionTypes(), AttentionMind.intentionAssets());
-            pendingMindState = null;
-            if (load.isSuccess()) {
-                mind = MindMachineManager.getInstance().registerInstance(load.machine().orElseThrow());
-            } else {
-                ViScriptNpc.LOGGER.warn("Discarding invalid AM state for NPC {}: {}", getUUID(), load.diagnostics());
-            }
-        }
-        if (mind == null) {
-            mind = MindMachineManager.getInstance().createInstance(mindActor, ai.toConfig());
-        }
-        flowRuntime = new NpcFlowRuntime(this, mind);
-        if (pendingFlowState != null) {
-            flowRuntime.restore(pendingFlowState);
-            pendingFlowState = null;
-        }
-        if (pendingPersistentVariables != null) {
-            flowRuntime.restorePersistentVariables(pendingPersistentVariables);
-            pendingPersistentVariables = null;
-        }
-        NpcAiDependencyIndex.register(this, flowRuntime.dependencies());
-        mindConfigHash = configHash;
-    }
-
-    private void syncMindState(NpcAI ai) {
-        if (this.level().isClientSide) return;
-        if (!ai.isEnabled()) {
-            clearMind();
-            return;
-        }
-
-        int configHash = currentMindConfigHash(ai);
-        if (mind == null) {
-            String globalFailure = NpcAiDependencyIndex.definitionFailure();
-            if (!globalFailure.isEmpty() && globalFailure.equals(aiDefinitionFailure)
-                    && mindConfigHash == configHash) return;
-            initMind(ai, configHash);
-        } else if (mindConfigHash != configHash) {
-            clearMind();
-            initMind(ai, configHash);
-        }
-    }
-
-    private void clearMind() {
-        NpcAiDependencyIndex.unregister(getUUID());
-        if (mind != null) {
-            MindMachineManager.getInstance().removeInstance(this);
-            mind = null;
-        }
-        mindActor = null;
-        flowRuntime = null;
-        pendingMindState = null;
-        pendingFlowState = null;
-        pendingPersistentVariables = null;
-        mindConfigHash = 0;
-    }
-
-    public void resetAiForDefinitionChange() {
-        if (level().isClientSide) return;
-        CompoundTag persistent = flowRuntime == null ? new CompoundTag() : flowRuntime.persistentVariables();
-        aiDefinitionFailure = "";
-        clearMind();
-        if (getNpcAI().isEnabled()) {
-            initMind();
-            if (flowRuntime != null) flowRuntime.restorePersistentVariables(persistent);
-        }
-    }
-
-    public void invalidateAiForDefinitionFailure(String detail) {
-        if (level().isClientSide) return;
-        Set<net.minecraft.resources.ResourceLocation> dependencies = flowRuntime == null
-                ? Set.of() : flowRuntime.dependencies();
-        clearMind();
-        aiDefinitionFailure = detail == null ? "AI definition reload failed" : detail;
-        NpcAiDependencyIndex.register(this, dependencies);
-        mindConfigHash = currentMindConfigHash(getNpcAI());
-    }
-
-    public boolean isNpcAiDebugPaused() {
-        return (mind != null && mind.isPaused()) || (flowRuntime != null && flowRuntime.isPaused());
-    }
-
-    public void setNpcAiDebugPaused(boolean paused) {
-        if (mind != null) {
-            if (paused) mind.pause();
-            else mind.resume();
-        }
-        if (flowRuntime != null) {
-            if (paused) flowRuntime.pause();
-            else flowRuntime.resume();
-        }
-    }
-
-    public void continueNpcAiDebug() {
-        amDebugBreakpointSkipNode = currentAmDebugNode();
-        if (mind != null) mind.resume();
-        if (flowRuntime != null) flowRuntime.resume();
-    }
-
-    public void stepNpcAiDebug() {
-        amDebugBreakpointSkipNode = currentAmDebugNode();
-        if (flowRuntime != null) flowRuntime.stepOnce();
-        if (mind != null) mind.stepOnce();
-    }
-
-    public void setNpcAiDebugBreakpoints(Set<UUID> breakpoints) {
-        if (flowRuntime != null) flowRuntime.setBreakpoints(breakpoints);
-        amDebugBreakpoints = breakpoints == null ? Set.of() : breakpoints.stream()
-                .map(id -> "n_" + id.toString().replace("-", ""))
-                .collect(Collectors.toUnmodifiableSet());
-    }
-
-    public void stopNpcAiDebug() {
-        if (mind != null) mind.interrupt();
-    }
-
-    private void applyAmDebugBreakpoint() {
-        String current = currentAmDebugNode();
-        if (current == null) {
-            amDebugBreakpointSkipNode = null;
-            return;
-        }
-        if (amDebugBreakpointSkipNode != null) {
-            if (amDebugBreakpointSkipNode.equals(current)) return;
-            amDebugBreakpointSkipNode = null;
-        }
-        if (amDebugBreakpoints.contains(current)) {
-            mind.pause();
-            if (flowRuntime != null) flowRuntime.pause();
-        }
-    }
-
-    @Nullable
-    private String currentAmDebugNode() {
-        if (mind == null) return null;
-        return mind.debugSnapshot().active().flatMap(value -> value.currentNode()).orElse(null);
-    }
-
-    public CompoundTag getAiDebugSnapshot() {
-        CompoundTag tag = new CompoundTag();
-        if (mind != null) {
-            tag.put("mind", mind.save());
-            tag.put("mind_debug", NpcAiDebugNbt.encode(mind.debugSnapshot()));
-        }
-        if (flowRuntime != null) tag.put("flow", flowRuntime.debugSnapshot());
-        if (!aiDefinitionFailure.isEmpty()) {
-            CompoundTag flow = tag.getCompound("flow");
-            net.minecraft.nbt.ListTag errors = flow.getList("errors", net.minecraft.nbt.Tag.TAG_COMPOUND);
-            CompoundTag error = new CompoundTag();
-            error.putString("code", "AI_DEFINITION_RELOAD_FAILED");
-            error.putString("detail", aiDefinitionFailure);
-            errors.add(error);
-            flow.put("errors", errors);
-            tag.put("flow", flow);
-        }
-        return tag;
-    }
-
-    private int currentMindConfigHash(NpcAI ai) {
-        return Objects.hash(ai.isEnabled(), ai.getTickRate(), ai.getSource(), ai.getEmbeddedFlow(),
-                ai.getEmbeddedParameters(), ai.getTemplateId(), ai.getTemplateParameterOverrides(), ai.getResolvedHash(),
-                ai.getEmbeddedDependencyHash());
-    }
-
     public String getNpcType() {
         return this.getNpcBasicsSetting().getNpcId();
-    }
-
-    public void triggerNpcFlow(String trigger, @Nullable LivingEntity target) {
-        if (flowRuntime != null) flowRuntime.trigger(trigger, target);
     }
 
     private void setAttributeBaseValue(Holder<Attribute> attribute, double value) {
@@ -620,7 +378,6 @@ public class CustomNpc extends PathfinderMob {
     @Override
     public void die(DamageSource source) {
         if (NeoForge.EVENT_BUS.post(new NpcEvent.Death(this, source)).isCanceled()) return;
-        triggerNpcFlow("death", source.getEntity() instanceof LivingEntity living ? living : null);
         super.die(source);
     }
 
@@ -712,14 +469,12 @@ public class CustomNpc extends PathfinderMob {
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.Hurt(event)).isCanceled()) {
                     event.setCanceled(true);
                 }
-                npc.triggerNpcFlow("hurt", source.getEntity() instanceof LivingEntity living ? living : null);
             }
             //npc攻击
             if (source.getEntity() instanceof CustomNpc npc) {
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.Attack(npc, event)).isCanceled()) {
                     event.setCanceled(true);
                 }
-                npc.triggerNpcFlow("attack", event.getEntity());
             }
         }
 
@@ -749,7 +504,6 @@ public class CustomNpc extends PathfinderMob {
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.Interact(npc, serverPlayer)).isCanceled()) {
                     event.setCanceled(true);
                 }
-                npc.triggerNpcFlow("interact", serverPlayer);
             }
         }
 
@@ -760,19 +514,6 @@ public class CustomNpc extends PathfinderMob {
                     event.setCanceled(true);
                     return;
                 }
-                if (!npc.level().isClientSide && npc.mind == null && npc.getNpcAI().isEnabled()) {
-                    npc.initMind();
-                }
-                npc.triggerNpcFlow("spawn", null);
-            }
-        }
-
-        @SubscribeEvent
-        public static void despawn(EntityLeaveLevelEvent event) {
-            if (event.getEntity() instanceof CustomNpc npc) {
-                if (!event.getLevel().isClientSide && npc.mind != null) {
-                    npc.clearMind();
-                }
             }
         }
 
@@ -780,7 +521,6 @@ public class CustomNpc extends PathfinderMob {
         public static void killed(LivingDeathEvent event) {
             DamageSource source = event.getSource();
             if (source.getEntity() instanceof CustomNpc npc) {
-                npc.triggerNpcFlow("killed", event.getEntity());
                 if (NeoForge.EVENT_BUS.post(new NpcEvent.Killed(npc, event.getEntity(), source)).isCanceled()) {
                     event.setCanceled(true);
                 }
@@ -820,9 +560,6 @@ public class CustomNpc extends PathfinderMob {
                 setLootTableKeys(server);
                 server.getPlayerList().getPlayers().forEach(EventHandler::sendLootTableKeys);
             } else sendLootTableKeys(event.getPlayer());
-            if (event.getPlayer() == null) {
-                event.getPlayerList().getPlayers().forEach(EventHandler::sendAiDescriptors);
-            } else sendAiDescriptors(event.getPlayer());
         }
 
         @SubscribeEvent
@@ -838,13 +575,6 @@ public class CustomNpc extends PathfinderMob {
             if (player.server.getPlayerList().isOp(player.getGameProfile()))
                 RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_LOOT_TABLES,
                         S2CPayload.encodeStrings(lootTableKeys));
-        }
-
-        private static void sendAiDescriptors(ServerPlayer player) {
-            if (player.server.getPlayerList().isOp(player.getGameProfile())) {
-                RPCPacketDistributor.rpcToPlayer(player, S2CPayload.SEND_NPC_AI_DESCRIPTORS,
-                        NpcFlowExtensionRegistry.descriptors());
-            }
         }
     }
 }

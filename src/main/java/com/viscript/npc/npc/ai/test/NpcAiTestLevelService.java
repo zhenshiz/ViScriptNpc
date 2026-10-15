@@ -22,7 +22,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -31,10 +30,6 @@ import net.neoforged.neoforge.event.EventHooks;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.jetbrains.annotations.Nullable;
-import org.thexeler.MindMachine;
-import org.thexeler.api.IntentionPriority;
-import org.thexeler.api.world.MindPosition;
-import org.thexeler.intention.base.MoveIntention;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -54,9 +49,9 @@ public final class NpcAiTestLevelService {
     public static final String ACTION_PLACE_ENTITY = "place_entity";
     public static final String ACTION_PLACE_PLAYER = "place_player";
     public static final String ACTION_MOVE_NPC = "move_npc";
+    public static final String ACTION_PATHFIND_NPC = "pathfind_npc";
     public static final String ACTION_MOVE_ENTITY = "move_entity";
     public static final String ACTION_DELETE_ENTITY = "delete_entity";
-    public static final String ACTION_PATHFIND_NPC = "pathfind_npc";
     public static final String ACTION_RESIZE_ARENA = "resize_arena";
 
     private static final int ARENA_GRID_SPACING = 64;
@@ -261,9 +256,9 @@ public final class NpcAiTestLevelService {
             case ACTION_PLACE_ENTITY -> placeEntity(level, session.region(), payload);
             case ACTION_PLACE_PLAYER -> placePlayer(player, session.region(), payload);
             case ACTION_MOVE_NPC -> moveNpc(level, session.region(), payload);
+            case ACTION_PATHFIND_NPC -> pathfindNpc(level, session.region(), payload);
             case ACTION_MOVE_ENTITY -> moveEntity(level, session.region(), payload);
             case ACTION_DELETE_ENTITY -> deleteEntity(level, session.region(), payload);
-            case ACTION_PATHFIND_NPC -> pathfindNpc(level, session.region(), payload);
             case ACTION_RESIZE_ARENA -> resizeArena(player, level, session,
                     payload.getInt("width"), payload.getInt("length"));
             default -> ViScriptNpc.LOGGER.warn("忽略未知的 NPC AI 测试操作：{}", action);
@@ -458,7 +453,7 @@ public final class NpcAiTestLevelService {
                 || !isEditablePosition(region, position, 2.0D)) {
             return;
         }
-        npc.getNavigation().stop();
+        npc.stopNavigation();
         npc.teleportTo(position.x(), position.y(), position.z());
         npc.setDeltaMovement(Vec3.ZERO);
         npc.fallDistance = 0.0F;
@@ -472,12 +467,23 @@ public final class NpcAiTestLevelService {
                 || !isEditableEntityPosition(region, entity, position)) {
             return;
         }
-        if (entity instanceof Mob mob) {
+        if (entity instanceof CustomNpc npc) {
+            npc.stopNavigation();
+        } else if (entity instanceof Mob mob) {
             mob.getNavigation().stop();
         }
         entity.teleportTo(position.x(), position.y(), position.z());
         entity.setDeltaMovement(Vec3.ZERO);
         entity.fallDistance = 0.0F;
+    }
+
+    private static void pathfindNpc(ServerLevel level, AABB region, CompoundTag payload) {
+        CustomNpc npc = getNpc(level, payload);
+        Vec3 position = readPosition(payload);
+        if (npc != null && position != null && NpcAiTestEnvironment.isEditable(region, npc.getBoundingBox())
+                && isEditableEntityPosition(region, npc, position)) {
+            npc.navigateTo(position, 1.0D);
+        }
     }
 
     private static void deleteEntity(ServerLevel level, AABB region, CompoundTag payload) {
@@ -487,26 +493,6 @@ public final class NpcAiTestLevelService {
             return;
         }
         entity.discard();
-    }
-
-    private static void pathfindNpc(ServerLevel level, AABB region, CompoundTag payload) {
-        CustomNpc npc = getNpc(level, payload);
-        Vec3 position = readPosition(payload);
-        if (npc != null && npc.getNpcAI().isEnabled() && position != null
-                && NpcAiTestEnvironment.isEditable(region, npc.getBoundingBox())
-                && isEditablePosition(region, position, 2.0D)) {
-            int groundY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                    Mth.floor(position.x()), Mth.floor(position.z()));
-            MindMachine mind = npc.getMind();
-            if (mind == null) {
-                npc.initMind();
-                mind = npc.getMind();
-            }
-            if (mind != null) {
-                mind.submit(MoveIntention.TYPE, IntentionPriority.URGENT, Map.of(
-                        "position", MindPosition.of(position.x(), groundY, position.z())));
-            }
-        }
     }
 
     @Nullable
@@ -540,7 +526,9 @@ public final class NpcAiTestLevelService {
         if (!payload.contains("x") || !payload.contains("y") || !payload.contains("z")) {
             return null;
         }
-        return new Vec3(payload.getDouble("x"), payload.getDouble("y"), payload.getDouble("z"));
+        Vec3 position = new Vec3(payload.getDouble("x"), payload.getDouble("y"), payload.getDouble("z"));
+        return Double.isFinite(position.x) && Double.isFinite(position.y) && Double.isFinite(position.z)
+                ? position : null;
     }
 
     private static boolean isEditablePosition(AABB region, Vec3 position, double height) {

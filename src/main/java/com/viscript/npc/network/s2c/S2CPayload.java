@@ -16,8 +16,6 @@ public class S2CPayload {
     public static final String OPEN_NPC_EDITOR = "openNpcEditor";
     public static final String SEND_LOOT_TABLES = "sendLootTables";
     public static final String SEND_FACTION_IDS = "sendFactionIds";
-    public static final String SEND_NPC_AI_DEBUG_SNAPSHOT = "sendNpcAiDebugSnapshot";
-    public static final String SEND_NPC_AI_DESCRIPTORS = "sendNpcAiDescriptors";
     public static final String SEND_NPC_AI_TEST_RUNTIME_NPCS =
             ViScriptNpc.MOD_ID + ":sendNpcAiTestRuntimeNpcs";
 
@@ -34,16 +32,6 @@ public class S2CPayload {
     @RPCPacket(SEND_FACTION_IDS)
     public static void setSendFactionIds(RPCSender sender, CompoundTag payload) {
         if (sender.isServer()) CustomNpc.factionIds = decodeStrings(payload);
-    }
-
-    @RPCPacket(SEND_NPC_AI_DEBUG_SNAPSHOT)
-    public static void sendNpcAiDebugSnapshot(RPCSender sender, CompoundTag payload) {
-        if (sender.isServer()) ViScriptNpcClientUtil.setNpcAiDebugSnapshot(payload);
-    }
-
-    @RPCPacket(SEND_NPC_AI_DESCRIPTORS)
-    public static void sendNpcAiDescriptors(RPCSender sender, CompoundTag payload) {
-        if (sender.isServer()) ViScriptNpcClientUtil.setNpcAiDescriptors(payload);
     }
 
     /**

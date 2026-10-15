@@ -39,8 +39,6 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
-import org.thexeler.api.IntentionPriority;
-import org.thexeler.intention.base.MoveIntention;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,7 +48,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 验证 NPC 编辑器能够打开真实维度测试页，并通过界面完成世界编辑、实体删除、NPC 拖拽和寻路操作。
+ * 验证 NPC 编辑器能够打开真实维度测试页，并通过界面完成世界编辑、实体删除、NPC 拖拽与寻路操作。
  */
 @LDLRegisterClient(
         name = "npc_ai_editor_real_level",
@@ -315,57 +313,27 @@ public final class NpcAiEditorRealLevelScenario implements UIScenario {
                     Vec3 start = server.get("npc_position_before_drag");
                     return npc != null && npc.position().distanceToSqr(start) > 0.25D;
                 })
-                .step("将鼠标移动到寻路目标", context -> {
+                .serverGet("记录右键寻路前的 NPC 位置", "npc_position_before_path", server -> testNpc(server).position())
+                .step("移动到 NPC 的寻路目标", context -> {
                     var bounds = context.el(SCENE).bounds();
-                    float[] target = {bounds.x() + bounds.width() * 0.56F,
-                            bounds.y() + bounds.height() * 0.56F};
-                    context.put("path_click", target);
-                    context.input().moveTo(target[0], target[1]);
+                    context.input().moveTo(bounds.x() + bounds.width() * 0.54F,
+                            bounds.y() + bounds.height() * 0.53F);
                 })
                 .frames(2)
-                .step("确认寻路目标", context -> {
-                    RealLevelSceneViewport.ScenePick pick = context.el(SCENE)
-                            .as(RealLevelSceneViewport.class).getCurrentScenePick();
-                    if (pick.blockHit() == null) {
-                        throw new IllegalStateException("编辑器测试视口未拾取到寻路目标");
-                    }
+                .check("寻路目标命中真实方块", context ->
+                        context.el(SCENE).as(RealLevelSceneViewport.class).getCurrentScenePick().blockHit() != null)
+                .step("右键发出选中 NPC 的寻路请求", context -> {
+                    var bounds = context.el(SCENE).bounds();
+                    float x = bounds.x() + bounds.width() * 0.54F;
+                    float y = bounds.y() + bounds.height() * 0.53F;
+                    context.input().mouseDown(x, y, Keys.MOUSE_RIGHT);
+                    context.input().mouseUp(x, y, Keys.MOUSE_RIGHT);
                 })
-                .server("记录 Attention Mind 寻路前位置", server -> {
+                .waitUntilServer("右键目标传入原生导航", server ->
+                        testNpc(server) != null && testNpc(server).getNavigation().getTargetPos() != null)
+                .waitUntilServer("NPC 按右键请求在真实维度中移动", server -> {
                     CustomNpc npc = testNpc(server);
-                    if (npc == null) {
-                        throw new IllegalStateException("未找到准备测试寻路的 NPC");
-                    }
-                    server.put("npc_position_before_attention_move", npc.position());
-                })
-                .step("右键按下寻路目标", context -> {
-                    float[] target = context.get("path_click");
-                    context.input().mouseDown(target[0], target[1], Keys.MOUSE_RIGHT);
-                })
-                .step("右键释放寻路目标", context -> {
-                    float[] target = context.get("path_click");
-                    context.input().mouseUp(target[0], target[1], Keys.MOUSE_RIGHT);
-                })
-                .waitUntilServer("NPC 接收到 Attention Mind 寻路意图", server -> {
-                    CustomNpc npc = testNpc(server);
-                    if (npc == null || npc.getMind() == null) {
-                        return false;
-                    }
-                    var snapshot = npc.getMind().debugSnapshot();
-                    return snapshot.active().stream().anyMatch(entry ->
-                            entry.type().equals(MoveIntention.TYPE)
-                                    && entry.priority() == IntentionPriority.URGENT)
-                            || snapshot.queued().stream().anyMatch(entry ->
-                            entry.type().equals(MoveIntention.TYPE)
-                                    && entry.priority() == IntentionPriority.URGENT);
-                })
-                .checkServer("Attention Mind 寻路没有占用原版导航路径", server -> {
-                    CustomNpc npc = testNpc(server);
-                    return npc != null && npc.getNavigation().getPath() == null;
-                })
-                .waitUntilServer("NPC 由 Attention Mind 移动控制器驱动", server -> {
-                    CustomNpc npc = testNpc(server);
-                    Vec3 start = server.get("npc_position_before_attention_move");
-                    return npc != null && npc.position().distanceToSqr(start) > 0.01D;
+                    return npc != null && npc.position().distanceToSqr(server.get("npc_position_before_path")) > 0.25D;
                 })
                 .key(Keys.BACKSPACE)
                 .waitUntilServer("退格键删除选中的 NPC", server ->

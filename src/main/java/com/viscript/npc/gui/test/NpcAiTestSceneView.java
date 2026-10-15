@@ -337,21 +337,6 @@ public final class NpcAiTestSceneView extends View {
         sendAction(NpcAiTestLevelService.ACTION_MOVE_ENTITY, payload);
     }
 
-    private void pathfindSelectedNpc(RealLevelSceneViewport.ScenePick pick) {
-        if (selectedEntityId < 0 || Minecraft.getInstance().level == null
-                || !(Minecraft.getInstance().level.getEntity(selectedEntityId) instanceof CustomNpc npc)
-                || !npc.getNpcAI().isEnabled()) {
-            return;
-        }
-        Vec3 position = surfacePosition(pick);
-        if (position == null) {
-            return;
-        }
-        CompoundTag payload = positionPayload(position);
-        payload.putInt("entityId", selectedEntityId);
-        sendAction(NpcAiTestLevelService.ACTION_PATHFIND_NPC, payload);
-    }
-
     private void deleteSelectedEntity() {
         if (selectedEntityId < 0 || Minecraft.getInstance().level == null) {
             return;
@@ -369,6 +354,19 @@ public final class NpcAiTestSceneView extends View {
             viewport.setHighlightedEntityId(-1);
         }
         updateStatus();
+    }
+
+    private void pathfindSelectedNpc(RealLevelSceneViewport.ScenePick pick) {
+        if (activeTool != Tool.SELECT || Minecraft.getInstance().level == null
+                || !(Minecraft.getInstance().level.getEntity(selectedEntityId) instanceof CustomNpc)) {
+            return;
+        }
+        Vec3 position = surfacePosition(pick);
+        if (position != null) {
+            CompoundTag payload = positionPayload(position);
+            payload.putInt("entityId", selectedEntityId);
+            sendAction(NpcAiTestLevelService.ACTION_PATHFIND_NPC, payload);
+        }
     }
 
     private static void sendAction(String action, CompoundTag payload) {
@@ -441,6 +439,7 @@ public final class NpcAiTestSceneView extends View {
         public void rightClick(RealLevelSceneViewport.ScenePick pick) {
             pathfindSelectedNpc(pick);
         }
+
     }
 
     private enum Tool {

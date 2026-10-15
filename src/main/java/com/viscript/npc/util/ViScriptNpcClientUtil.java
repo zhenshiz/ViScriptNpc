@@ -5,10 +5,9 @@ import com.lowdragmc.lowdraglib2.editor.ui.Editor;
 import com.lowdragmc.lowdraglib2.editor.ui.EditorWindow;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIContainerScreen;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIScreen;
+import com.lowdragmc.lowdraglib2.integration.kjs.KJSBindings;
 import com.viscript.npc.gui.edit.NPCProject;
 import com.viscript.npc.gui.test.NpcTestSceneProject;
-import com.viscript.npc.npc.CustomNpc;
-import com.viscript.npc.npc.ai.editor.NpcAiDescriptorCache;
 import com.viscript.npc.npc.ai.test.NpcAiTestEnvironment;
 import dev.latvian.mods.kubejs.typings.Info;
 import net.minecraft.core.BlockPos;
@@ -20,15 +19,11 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
+@KJSBindings(value = "ViScriptNpcUtil",clientOnly = true)
 public class ViScriptNpcClientUtil {
-    private static final double NPC_AI_DEBUG_TARGET_RADIUS = 64.0D;
-    private static final Map<Integer, CompoundTag> NPC_AI_DEBUG_SNAPSHOTS = new HashMap<>();
     private static List<NpcRuntimeEntry> npcAiTestRuntimeNpcs = List.of();
     private static int npcAiTestRuntimeNpcRevision;
 
@@ -68,39 +63,6 @@ public class ViScriptNpcClientUtil {
         if (cacheNpcProject != null) {
             editor.loadProject(cacheNpcProject, null);
         }
-    }
-
-    public static int findNearestNpcAiDebugTarget(@Nullable String npcType) {
-        CustomNpc npc = findNearestNpcAiDebugTargetEntity(npcType);
-        return npc == null ? -1 : npc.getId();
-    }
-
-    public static String getClientNpcDebugName(int entityId) {
-        Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null || !(minecraft.level.getEntity(entityId) instanceof CustomNpc npc)) {
-            return "";
-        }
-        return npc.getNpcType() + " #" + entityId;
-    }
-
-    public static void setNpcAiDebugSnapshot(CompoundTag payload) {
-        if (payload == null || !payload.contains("entityId")) {
-            return;
-        }
-        NPC_AI_DEBUG_SNAPSHOTS.put(payload.getInt("entityId"), payload.copy());
-    }
-
-    public static CompoundTag getNpcAiDebugSnapshot(int entityId) {
-        CompoundTag payload = NPC_AI_DEBUG_SNAPSHOTS.get(entityId);
-        return payload == null ? new CompoundTag() : payload.copy();
-    }
-
-    public static void setNpcAiDescriptors(CompoundTag payload) {
-        NpcAiDescriptorCache.set(payload);
-    }
-
-    public static CompoundTag getNpcAiDescriptors() {
-        return NpcAiDescriptorCache.get();
     }
 
     /**
@@ -188,22 +150,6 @@ public class ViScriptNpcClientUtil {
             return editorWindow;
         }
         return null;
-    }
-
-    @Nullable
-    private static CustomNpc findNearestNpcAiDebugTargetEntity(@Nullable String npcType) {
-        Minecraft minecraft = Minecraft.getInstance();
-        LocalPlayer player = minecraft.player;
-        if (player == null || minecraft.level == null) {
-            return null;
-        }
-        String targetType = npcType == null ? "" : npcType.trim();
-        return minecraft.level.getEntitiesOfClass(CustomNpc.class,
-                        player.getBoundingBox().inflate(NPC_AI_DEBUG_TARGET_RADIUS))
-                .stream()
-                .filter(npc -> targetType.isEmpty() || targetType.equals(npc.getNpcType()))
-                .min(Comparator.comparingDouble(player::distanceToSqr))
-                .orElse(null);
     }
 
     /**

@@ -49,6 +49,8 @@ public class NpcBasicsSetting implements INpcData {
     private ResourceLocation textureLocation = ResourceLocation.withDefaultNamespace("textures/entity/player/slim/steve.png");
     @Persisted
     private String texturePlayerName = "";
+    @Persisted
+    private String textureUrl = "";
     @Configurable(name = "npcConfig.npcBasicsSetting.capeTexture", tips = "npcConfig.npcBasicsSetting.capeTexture.tips")
     private ResourceLocation capeTexture = ViScriptNpc.id("textures/default_cape.png");
     @Configurable(name = "npcConfig.npcBasicsSetting.invulnerable")
@@ -62,6 +64,13 @@ public class NpcBasicsSetting implements INpcData {
                     group.addConfigurator(ConfiguratorUtil.ofResourceLocation("npcConfig.npcBasicsSetting.textureLocation", this::getTextureLocation, this::setTextureLocation, textureLocation, true));
             case PLAYER_NAME ->
                     group.addConfigurator(new StringConfigurator("npcConfig.npcBasicsSetting.texturePlayerName", this::getTexturePlayerName, this::setTexturePlayerName, texturePlayerName, true));
+            case URL -> {
+                StringConfigurator url = new StringConfigurator("npcConfig.npcBasicsSetting.textureUrl",
+                        this::getTextureUrl, this::setTextureUrl, textureUrl, true);
+                url.setTips("npcConfig.npcBasicsSetting.textureUrl.tips");
+                url.textField.setId("npc_skin_url");
+                group.addConfigurator(url);
+            }
         }
     }
 
@@ -69,6 +78,7 @@ public class NpcBasicsSetting implements INpcData {
         return switch (skinType) {
             case RESOURCE_PACK -> textureLocation;
             case PLAYER_NAME -> RenderUtil.getSkin(texturePlayerName).texture();
+            case URL -> RenderUtil.getUrlSkinTexture(textureUrl);
         };
     }
 
@@ -76,7 +86,8 @@ public class NpcBasicsSetting implements INpcData {
     @AllArgsConstructor
     public enum SkinType implements StringRepresentable {
         RESOURCE_PACK("npcConfig.npcBasicsSetting.skinType.resourcePack"),
-        PLAYER_NAME("npcConfig.npcBasicsSetting.skinType.playerName");
+        PLAYER_NAME("npcConfig.npcBasicsSetting.skinType.playerName"),
+        URL("npcConfig.npcBasicsSetting.skinType.url");
 
         private final String name;
 
