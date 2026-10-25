@@ -344,6 +344,16 @@ public class RealLevelSceneViewport extends UIElement {
         Entity previousCrosshairEntity = renderDispatcher.crosshairPickEntity;
         Camera sceneCamera = ((WorldSceneRendererAccessor) sceneRenderer).viscript_npc$getCamera();
         PoseStack poseStack = new PoseStack();
+        var debug = com.viscript.npc.gui.ai.AiClientDebug.latest;
+        if (debug.entityId == highlightedEntityId) for (var point : debug.path) {
+            LevelRenderer.renderLineBox(poseStack, buffers.getBuffer(SCENE_OUTLINE),
+                    new AABB(point.x - .07, point.y + .03, point.z - .07, point.x + .07, point.y + .17, point.z + .07),
+                    .2f, .8f, 1f, 1f);
+        }
+        if (debug.entityId == highlightedEntityId) for (var volume : debug.perceptions)
+            com.viscript.npc.gui.ai.AiPerceptionRenderer.render(poseStack, buffers.getBuffer(SCENE_OUTLINE), volume);
+        if (debug.entityId == highlightedEntityId) for (var line : debug.lines)
+            com.viscript.npc.gui.ai.AiPerceptionRenderer.line(poseStack, buffers.getBuffer(SCENE_OUTLINE), line.from, line.to, .3f, 1f, .5f);
         renderDispatcher.prepare(sourceLevel, sceneCamera, null);
 
         try {

@@ -1,0 +1,41 @@
+.npc_ai_stage_frame {
+    background: built-in(ui-gdp:BORDER1_RT1);
+}
+
+.npc_ai_state {
+    background: #D84D4D;
+}
+
+.npc_ai_state_running {
+    background: #54D66A;
+}
+
+.npc_ai_breakpoint {
+    background: #FFBD44;
+}
+
+.npc_ai_debug_cursor {
+    text-color: #FFBD44;
+    text-shadow: true;
+}
+
+.npc_ai_node_disabled {
+    opacity: 0.55;
+}
+
+#npc_ai_test_toolbar tab:not(tab:selected) > .npc_ai_toolbar_icon {
+    color: #000000;
+}
+
+#npc_ai_test_toolbar .npc_ai_test_shortcut {
+    text-color: #000000;
+    text-shadow: false;
+}
+
+#npc_ai_test_toolbar tab:selected > .npc_ai_test_shortcut {
+    text-color: #FFFFFF;
+}
+
+.npc_ai_action_library_row > .__icon__ {
+    color: #000000;
+}

@@ -68,8 +68,16 @@ public class CustomNpcRender<T extends CustomNpc, M extends HumanoidModel<T>> ex
     }
 
     @Override
+    protected boolean shouldShowName(T npc) {
+        // 预览实体位于虚拟世界，不能用真实世界摄像机的距离决定名称是否可见。
+        return npc.getNpcBasicsSetting().isNameVisible()
+                && (npc.getPreviewCameraOrientation() != null || super.shouldShowName(npc));
+    }
+
+    @Override
     protected void renderNameTag(T npc, Component displayName, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, float partialTick) {
-        if (this.shouldShowName(npc) && ClientHooks.isNameplateInRenderDistance(npc, this.entityRenderDispatcher.distanceToSqr(npc)) && npc.getNpcBasicsSetting().isNameVisible()) {
+        if (this.shouldShowName(npc) && (npc.getPreviewCameraOrientation() != null
+                || ClientHooks.isNameplateInRenderDistance(npc, this.entityRenderDispatcher.distanceToSqr(npc)))) {
             Vec3 vec3 = getNpcNameTagPosition(npc, partialTick);
             if (vec3 != null) {
                 boolean seeThrough = !npc.isDiscrete();

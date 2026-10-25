@@ -30,14 +30,18 @@ public final class NpcAttackExecutor {
     }
 
     public static boolean ranged(CustomNpc npc, LivingEntity target, RangedAttackData data) {
-        if (!canAttack(npc, target, data.range())) {
-            return false;
-        }
+        return ranged(npc, target, data, null);
+    }
+
+    public static boolean ranged(CustomNpc npc, LivingEntity target, RangedAttackData data,
+                                 java.util.function.Consumer<LivingEntity> onHit) {
+        if (!canAttack(npc, target, data.range())) return false;
         npc.getLookControl().setLookAt(target, 30.0F, 30.0F);
         boolean spawned = false;
         for (int i = 0; i < data.projectilesPerShot(); i++) {
             NpcProjectile projectile = new NpcProjectile(npc.level(), npc);
             projectile.configureFrom(data);
+            projectile.setAiHitCallback(onHit);
             double x = target.getX() - npc.getX();
             double y = target.getY(0.3333333333333333D) - projectile.getY();
             double z = target.getZ() - npc.getZ();

@@ -3,7 +3,6 @@ package com.viscript.npc.util;
 import com.lowdragmc.lowdraglib2.Platform;
 import com.viscript.npc.ViScriptNpc;
 import com.viscript.npc.npc.data.basics_setting.NpcBasicsSetting;
-import com.viscript_lib.gui.editor.EditorAssetFiles;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
@@ -29,7 +28,7 @@ public final class NpcRuntimeFiles {
      * @return 不含运行时文件后缀的逻辑文件标识列表
      */
     public static List<String> listFileIds() {
-        return EditorAssetFiles.listRuntimeFiles(NpcEditorFormats.NPC, true);
+        return NpcEditorFiles.listRuntimeFiles(NpcEditorFormats.NPC, true);
     }
 
     /**
@@ -56,12 +55,14 @@ public final class NpcRuntimeFiles {
      */
     public static CompoundTag load(String fileId) {
         try {
-            Path file = EditorAssetFiles.resolveRuntimeFile(NpcEditorFormats.NPC, fileId, true);
+            Path file = NpcEditorFiles.resolveRuntimeFile(NpcEditorFormats.NPC, fileId, true);
             if (!Files.isRegularFile(file)) {
                 return new CompoundTag();
             }
             try (var input = Files.newInputStream(file)) {
-                return NbtIo.readCompressed(input, NbtAccounter.unlimitedHeap());
+                var data = NbtIo.readCompressed(input, NbtAccounter.create(16 * 1024 * 1024));
+                NpcAiPublication.prepareConfig(data, false);
+                return data;
             }
         } catch (IOException | RuntimeException exception) {
             ViScriptNpc.LOGGER.warn("无法读取 NPC 运行时文件 {}：{}", fileId, exception.getMessage());

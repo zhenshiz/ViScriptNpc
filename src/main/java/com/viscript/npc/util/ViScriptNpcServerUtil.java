@@ -21,7 +21,7 @@ import net.minecraft.world.phys.Vec3;
 public class ViScriptNpcServerUtil {
     @Info("服务端打开NPC编辑器")
     public static void openNpcEditor(ServerPlayer player, CompoundTag tag) {
-        PlayerUIMenuType.openUI(player, NpcEditor.EDITOR_ID);
+        PlayerUIMenuType.openUI(player, com.viscript.npc.ViScriptNpc.id("editor"));
         RPCPacketDistributor.rpcToPlayer(player, S2CPayload.OPEN_NPC_EDITOR, tag);
     }
 

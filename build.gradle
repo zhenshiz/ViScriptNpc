@@ -123,6 +123,7 @@ neoForge {
 
         gameTestServer {
             type = "gameTestServer"
+            gameDirectory = layout.buildDirectory.dir('npc-ai-gametest').get().asFile
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
@@ -133,6 +134,9 @@ neoForge {
         }
 
         configureEach {
+            if (project.hasProperty('ldTest') && name == 'client') {
+                gameDirectory = layout.buildDirectory.dir('npc-ai-client-test').get().asFile
+            }
             systemProperty 'forge.logging.markers', 'REGISTRIES'
 
             if (name != "gameTestServer") {
@@ -154,6 +158,7 @@ neoForge {
 }
 
 apply from: rootProject.file('gradle/ldlib2-uitest.gradle')
+apply from: rootProject.file('gradle/ldlib2-mptest.gradle')
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 

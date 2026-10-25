@@ -1,0 +1,9 @@
+Baritone 1.11.3 — LGPL-3.0-or-later
+Source: https://github.com/cabaletta/baritone/tree/v1.11.3
+
+The navigation/baritone package contains adapted A* relaxation, PathNode,
+binary heap and action costs from Baritone. Entity-sized collision snapshots,
+movement candidates and server execution are adapted for ViScriptNpc.
+Client contexts, player input, breaking, placing, caches and native code are excluded.
+Modified source is distributed with ViScriptNpc under the same LGPL terms.
+Rebuild this project to replace or modify the adapted implementation.

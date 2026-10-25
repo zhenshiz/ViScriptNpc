@@ -10,7 +10,7 @@ import com.viscript.npc.gui.test.NpcTestSceneProject;
 import com.viscript.npc.util.NpcEditorFormats;
 import com.viscript.npc.util.NpcRuntimeFiles;
 import com.viscript.npc.util.ViScriptNpcServerUtil;
-import com.viscript_lib.gui.editor.EditorAssetFiles;
+import com.viscript.npc.util.NpcEditorFiles;
 import com.viscript_lib.gui.editor.EditorFileFormat;
 import com.viscript_lib.register.ICommand;
 import lombok.SneakyThrows;
@@ -73,19 +73,19 @@ public class NpcCommand implements ICommand {
     }
 
     static List<String> getServerEditorFiles() {
-        return EditorAssetFiles.listProjectFiles(FORMAT, true);
+        return NpcEditorFiles.listProjectFiles(FORMAT, true);
     }
 
     static List<String> getServerTestSceneFiles() {
-        return EditorAssetFiles.listProjectFiles(NpcTestSceneProject.FORMAT, true);
+        return NpcEditorFiles.listRuntimeFiles(NpcTestSceneProject.FORMAT, true);
     }
 
     static File getNpcProjectFile(String fileName) {
-        return EditorAssetFiles.resolveProjectFile(FORMAT, normalizeFileArgument(fileName), true).toFile();
+        return NpcEditorFiles.resolveProjectFile(FORMAT, normalizeFileArgument(fileName), true).toFile();
     }
 
-    static File getTestSceneProjectFile(String fileName) {
-        return EditorAssetFiles.resolveProjectFile(NpcTestSceneProject.FORMAT,
+    static File getTestSceneFile(String fileName) {
+        return NpcEditorFiles.resolveRuntimeFile(NpcTestSceneProject.FORMAT,
                 normalizeFileArgument(fileName), true).toFile();
     }
 
@@ -172,11 +172,16 @@ public class NpcCommand implements ICommand {
             project.initNewProject();
             projectTag = project.serializeNBT(Platform.getFrozenRegistry());
         } else {
-            projectTag = readProjectFile(getTestSceneProjectFile(fileName));
+            try {
+                var project = NpcTestSceneProject.PROVIDER.loadProjectFromFile(getTestSceneFile(fileName));
+                projectTag = project.serializeNBT(Platform.getFrozenRegistry());
+            } catch (Exception exception) {
+                projectTag = new CompoundTag();
+            }
         }
         if (!fileName.isEmpty() && projectTag.isEmpty()) {
             source.sendFailure(Component.translatable(
-                    "command.viscript_npc.test_scene.project_file_required", fileName));
+                    "command.viscript_npc.test_scene.function_file_required", fileName));
             return 0;
         }
         ViScriptNpcServerUtil.openNpcEditor(player, projectTag);

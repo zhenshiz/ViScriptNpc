@@ -15,7 +15,7 @@ public final class EditorSceneCameraController implements SceneCameraController 
     private static final float MAX_PITCH = (float) Math.toRadians(89.5);
     private static final float MIN_DISTANCE = 3.0f;
     private static final float MAX_DISTANCE = 96.0f;
-    private static final float ZOOM_BASE = 0.82f;
+    private static final float ZOOM_BASE = 0.94f;
 
     private final Vector3f eyePosition = new Vector3f();
     private final Vector3f lookAtPosition = new Vector3f();
@@ -99,7 +99,7 @@ public final class EditorSceneCameraController implements SceneCameraController 
             return;
         }
         distance = Mth.clamp(
-                (float) (distance * Math.pow(ZOOM_BASE, scrollDelta)),
+                (float) (distance * Math.pow(ZOOM_BASE, Mth.clamp(scrollDelta, -1.0, 1.0))),
                 MIN_DISTANCE,
                 MAX_DISTANCE);
         updateEyeFromLookAt();

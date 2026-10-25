@@ -152,7 +152,7 @@ public class NpcListView extends View implements INpcEditorSlotView {
 
     private void createNewNpc() {
         if (editor.getCurrentProject() instanceof NPCProject npcProject) {
-            CompoundTag tag = npcProject.npc.serializeNBT(Platform.getFrozenRegistry());
+            CompoundTag tag = npcProject.serializeRuntimeFile(Platform.getFrozenRegistry());
             tag.putString("npcType", npcProject.getCurrentNpcType());
             RPCPacketDistributor.rpcToServer(C2SPayload.CREATE_NEW_NPC, tag);
         }
@@ -191,7 +191,7 @@ public class NpcListView extends View implements INpcEditorSlotView {
             return;
         }
         if (editor.getCurrentProject() instanceof NPCProject npcProject) {
-            CompoundTag tag = npcProject.npc.serializeNBT(Platform.getFrozenRegistry());
+            CompoundTag tag = npcProject.serializeRuntimeFile(Platform.getFrozenRegistry());
             tag.putString("npcType", npcProject.getCurrentNpcType());
             RPCPacketDistributor.rpcToServer(C2SPayload.OVERWRITE_NPC, selectedEntityId, tag);
         }

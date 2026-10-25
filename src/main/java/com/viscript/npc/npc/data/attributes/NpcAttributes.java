@@ -14,9 +14,6 @@ public class NpcAttributes implements INpcData {
     @Configurable(name = "npcConfig.npcAttributes.maxHealth")
     @ConfigNumber(range = {1, 1024}, wheel = 0.1)
     private double maxHealth = 20;
-    @Configurable(name = "npcConfig.npcAttributes.movementSpeed")
-    @ConfigNumber(range = {0, 1024}, wheel = 0.1)
-    private double movementSpeed = 0.7;
     @Configurable(name = "npcConfig.npcAttributes.resistanceConfig", subConfigurable = true)
     private ResistanceConfig resistanceConfig = new ResistanceConfig();
     @Configurable(name = "npcConfig.npcAttributes.defenseConfig", subConfigurable = true)

@@ -60,7 +60,6 @@ public class NpcAttributesComparisonView extends View implements INpcEditorSlotV
         addHeaderRow();
         addGroup("viscript_npc.editor.attributes.group.core", List.of(
                 row("npcConfig.npcAttributes.maxHealth", current, NpcAttributes::getMaxHealth),
-                row("npcConfig.npcAttributes.movementSpeed", current, NpcAttributes::getMovementSpeed),
                 row("npcConfig.npcAttributes.combatRegenRate", current, NpcAttributes::getCombatRegenRate),
                 row("npcConfig.npcAttributes.outOfCombatRegenRate", current, NpcAttributes::getOutOfCombatRegenRate)
         ));

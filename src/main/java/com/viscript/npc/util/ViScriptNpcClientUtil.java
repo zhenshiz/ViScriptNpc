@@ -27,7 +27,21 @@ public class ViScriptNpcClientUtil {
     private static List<NpcRuntimeEntry> npcAiTestRuntimeNpcs = List.of();
     private static int npcAiTestRuntimeNpcRevision;
 
-    public static NPCProject cacheNpcProject;
+    /**
+     * 将服务端场地快照交给与请求匹配的编辑器标签页。
+     *
+     * @param requestId 保存请求标识
+     * @param payload 服务端场地快照或失败标识
+     */
+    public static void receiveNpcAiTestScene(String requestId, CompoundTag payload) {
+        EditorWindow window = getCurrentEditorWindow();
+        if (window == null) return;
+        for (Editor editor : java.util.List.copyOf(window.getEditors().keySet())) {
+            if (editor instanceof com.viscript.npc.gui.edit.NpcEditor npcEditor) {
+                npcEditor.receiveTestSceneSnapshot(requestId, payload);
+            }
+        }
+    }
 
     @Info("客户端打开 NPC 编辑器")
     public static void openNpcEditor(@Nullable CompoundTag tag) {
@@ -51,17 +65,19 @@ public class ViScriptNpcClientUtil {
                         && tag.contains(NpcAiTestEnvironment.ARENA_CENTER_TAG, Tag.TAG_LONG)) {
                     BlockPos arenaCenter = BlockPos.of(tag.getLong(NpcAiTestEnvironment.ARENA_CENTER_TAG));
                     testProject.setRuntimeArenaCenter(arenaCenter);
+                    testProject.runtimeNpcId = tag.contains("ai_selected_npc") ? tag.getInt("ai_selected_npc") : -1;
                 }
+                Editor sourceEditor = editor;
+                if (tag.getBoolean("ai_new_editor")) editor = editorWindow.createNewEditor(com.viscript.npc.gui.edit.NpcEditor::new);
                 editor.loadProject(project, null);
+                if (tag.getBoolean("ai_detach_scene") && editor instanceof com.viscript.npc.gui.edit.NpcEditor npcEditor
+                        && npcEditor.openTestSceneWindow()) editorWindow.showEditor(sourceEditor);
                 return;
             } catch (Exception exception) {
                 showEditorOpenFailure(Component.translatable("viscript_npc.editor.open_project.failed",
                         exception.getClass().getSimpleName()));
                 return;
             }
-        }
-        if (cacheNpcProject != null) {
-            editor.loadProject(cacheNpcProject, null);
         }
     }
 
@@ -124,7 +140,7 @@ public class ViScriptNpcClientUtil {
             return false;
         }
         CompoundTag data = tag.getCompound("data");
-        return data.getBoolean("test_scene") || data.contains("presets", Tag.TAG_LIST);
+        return data.getBoolean("test_scene");
     }
 
     private static void showEditorOpenFailure(Component message) {

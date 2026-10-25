@@ -23,6 +23,7 @@ public class NpcRegister {
     public static void registerAttributes(EntityAttributeCreationEvent event) {
         event.put(CUSTOM_NPC.get(), Monster.createMonsterAttributes()
                 .add(Attributes.MAX_HEALTH, 20)
+                .add(Attributes.MOVEMENT_SPEED, .5)
                 .build());
     }
 

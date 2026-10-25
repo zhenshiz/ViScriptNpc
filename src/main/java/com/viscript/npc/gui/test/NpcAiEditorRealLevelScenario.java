@@ -3,8 +3,6 @@ package com.viscript.npc.gui.test;
 import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.editor.ui.EditorWindow;
 import com.lowdragmc.lowdraglib2.gui.holder.ModularUIContainerScreen;
-import com.lowdragmc.lowdraglib2.gui.ui.data.TextWrap;
-import com.lowdragmc.lowdraglib2.gui.ui.elements.Label;
 import com.lowdragmc.lowdraglib2.gui.ui.elements.TextField;
 import com.lowdragmc.lowdraglib2.registry.RegistrationEnvironment;
 import com.lowdragmc.lowdraglib2.registry.annotation.LDLRegisterClient;
@@ -25,7 +23,7 @@ import com.viscript.npc.util.NpcEditorFormats;
 import com.viscript.npc.util.ViScriptNpcServerUtil;
 import com.viscript_lib.gui.components.search.BlockSearchBox;
 import com.viscript_lib.gui.components.search.EntityTypeSearchBox;
-import com.viscript_lib.gui.editor.EditorAssetFiles;
+import com.viscript.npc.util.NpcEditorFiles;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
@@ -180,9 +178,8 @@ public final class NpcAiEditorRealLevelScenario implements UIScenario {
                 .check("操作说明位于服务端 NPC 列表上方", context ->
                         context.el("#npc_ai_test_tool_help").bounds().y()
                                 < context.el("#npc_ai_test_runtime_npcs").bounds().y())
-                .check("操作说明使用悬停滚动文本", context ->
-                        context.el("#npc_ai_test_tool_help").as(Label.class)
-                                .getTextStyle().textWrap() == TextWrap.HOVER_ROLL)
+                .check("操作说明图标提供悬停提示", context ->
+                        context.el("#npc_ai_test_tool_help").element().getStyle().tooltips().tooltips().length > 0)
                 .hover("#npc_ai_test_tool_help")
                 .frames(2)
                 .screenshot("server_runtime_npc_list")
@@ -314,6 +311,7 @@ public final class NpcAiEditorRealLevelScenario implements UIScenario {
                     return npc != null && npc.position().distanceToSqr(start) > 0.25D;
                 })
                 .serverGet("记录右键寻路前的 NPC 位置", "npc_position_before_path", server -> testNpc(server).position())
+                .serverGet("记录寻路请求次数", "npc_requests_before_path", server -> testNpc(server).getNpcNavigation().requests())
                 .step("移动到 NPC 的寻路目标", context -> {
                     var bounds = context.el(SCENE).bounds();
                     context.input().moveTo(bounds.x() + bounds.width() * 0.54F,
@@ -329,8 +327,9 @@ public final class NpcAiEditorRealLevelScenario implements UIScenario {
                     context.input().mouseDown(x, y, Keys.MOUSE_RIGHT);
                     context.input().mouseUp(x, y, Keys.MOUSE_RIGHT);
                 })
-                .waitUntilServer("右键目标传入原生导航", server ->
-                        testNpc(server) != null && testNpc(server).getNavigation().getTargetPos() != null)
+                .waitUntilServer("右键目标传入 NPC 导航", server ->
+                        testNpc(server) != null && testNpc(server).getNpcNavigation().requests()
+                                > server.<Long>get("npc_requests_before_path"))
                 .waitUntilServer("NPC 按右键请求在真实维度中移动", server -> {
                     CustomNpc npc = testNpc(server);
                     return npc != null && npc.position().distanceToSqr(server.get("npc_position_before_path")) > 0.25D;
@@ -563,7 +562,7 @@ public final class NpcAiEditorRealLevelScenario implements UIScenario {
     }
 
     private static void writeRuntimeNpcFixture(ServerContext server) {
-        Path file = EditorAssetFiles.resolveRuntimeFile(NpcEditorFormats.NPC, RUNTIME_NPC_FILE, true);
+        Path file = NpcEditorFiles.resolveRuntimeFile(NpcEditorFormats.NPC, RUNTIME_NPC_FILE, true);
         try {
             server.put("runtime_npc_fixture_existed", Files.isRegularFile(file));
             if (Files.isRegularFile(file)) {
@@ -579,7 +578,7 @@ public final class NpcAiEditorRealLevelScenario implements UIScenario {
     }
 
     private static void restoreRuntimeNpcFixture(ServerContext server) {
-        Path file = EditorAssetFiles.resolveRuntimeFile(NpcEditorFormats.NPC, RUNTIME_NPC_FILE, true);
+        Path file = NpcEditorFiles.resolveRuntimeFile(NpcEditorFormats.NPC, RUNTIME_NPC_FILE, true);
         try {
             if (Boolean.TRUE.equals(server.get("runtime_npc_fixture_existed"))) {
                 byte[] backup = server.get("runtime_npc_fixture_backup");

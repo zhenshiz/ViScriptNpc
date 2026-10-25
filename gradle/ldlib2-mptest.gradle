@@ -1,0 +1,45 @@
+// Isolated dedicated-server/two-client runs, driven by LDLib2's control hub.
+def mpOutput = layout.buildDirectory.dir('ldlib2-mptest').get().asFile
+def mpRuns = layout.buildDirectory.dir('npc-ai-multiplayer').get().asFile
+// The parent compiles once before launch. Concurrent child Gradle builds must not
+// replace class files while another JVM is loading the same output directory.
+if (project.hasProperty('ldMpHub')) {
+    tasks.named('compileJava') { enabled = false }
+    tasks.named('processResources') { enabled = false }
+}
+neoForge.runs {
+    mpServer {
+        server()
+        gameDirectory = new File(mpRuns, 'server')
+        programArgument '--nogui'
+        systemProperty 'ldlib2.mptest.role', 'server'
+        systemProperty 'ldlib2.mptest.hub', project.findProperty('ldMpHub') ?: ''
+        systemProperty 'ldlib2.mptest.out', new File(mpOutput, 'server').absolutePath
+    }
+    ['A', 'B'].each { role ->
+        create("mpClient${role}") {
+            client()
+            gameDirectory = new File(mpRuns, "client${role}")
+            programArguments.addAll '--username', "LDTest${role}"
+            systemProperty 'ldlib2.mptest.role', role
+            systemProperty 'ldlib2.mptest.hub', project.findProperty('ldMpHub') ?: ''
+            systemProperty 'ldlib2.mptest.out', new File(mpOutput, "client${role}").absolutePath
+            systemProperty 'ldlib2.uitest.window', '960x600'
+            systemProperty 'ldlib2.uitest.guiScale', '2'
+        }
+    }
+}
+
+tasks.register('runMpTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs NPC AI replication checks on a dedicated server and two real clients.'
+    dependsOn 'classes'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+    classpath = configurations.runtimeClasspath
+    mainClass = 'com.lowdragmc.lowdraglib2.uitest.mp.MPTestOrchestrator'
+    args '--projectDir', projectDir.absolutePath,
+            '--out', mpOutput.absolutePath,
+            '--serverDir', new File(mpRuns, 'server').absolutePath,
+            '--selection', project.findProperty('ldMpTest') ?: 'npc_ai_replication',
+            '--clients', 'A,B', '--timeoutSec', '360'
+}

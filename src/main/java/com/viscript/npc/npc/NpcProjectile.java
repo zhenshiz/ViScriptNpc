@@ -30,6 +30,9 @@ public class NpcProjectile extends ThrowableItemProjectile {
     private static final EntityDataAccessor<Float> DATA_VISUAL_SCALE = SynchedEntityData.defineId(NpcProjectile.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<String> DATA_TRAIL_TYPE = SynchedEntityData.defineId(NpcProjectile.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<String> DATA_HIT_SOUND = SynchedEntityData.defineId(NpcProjectile.class, EntityDataSerializers.STRING);
+    private java.util.function.Consumer<LivingEntity> aiHitCallback;
+    /** 注册本次飞行的成功伤害回调；回调不跨存档恢复。 */
+    public void setAiHitCallback(java.util.function.Consumer<LivingEntity> callback) { aiHitCallback = callback; }
     private double damage = 2;
     private double knockback;
     private float explosionPower;
@@ -113,6 +116,7 @@ public class NpcProjectile extends ThrowableItemProjectile {
     @Override
     public void tick() {
         super.tick();
+        if (!level().isClientSide && tickCount > 1200 && aiHitCallback != null) discard();
         if (this.level().isClientSide && this.tickCount > 1) {
             spawnTrailParticle();
         }
@@ -161,6 +165,8 @@ public class NpcProjectile extends ThrowableItemProjectile {
         if (accepted && target instanceof LivingEntity livingTarget) {
             applyKnockback(livingTarget, owner);
             applyAdditionalEffect(livingTarget);
+            var callback = aiHitCallback; aiHitCallback = null;
+            if (callback != null) callback.accept(livingTarget);
         }
     }
 

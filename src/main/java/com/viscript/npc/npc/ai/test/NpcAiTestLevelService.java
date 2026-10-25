@@ -6,6 +6,7 @@ import com.viscript.npc.npc.NpcRegister;
 import com.viscript.npc.util.NpcRuntimeFiles;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
@@ -22,6 +23,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -60,6 +64,71 @@ public final class NpcAiTestLevelService {
     private static final Map<UUID, TestSession> TEST_SESSIONS = new HashMap<>();
 
     private NpcAiTestLevelService() {
+    }
+
+    /**
+     * 读取玩家当前场地中可写入测试场景文件的方块数据。
+     *
+     * @param player 请求保存的玩家
+     * @param expectedCenter 客户端工程绑定的场地中心
+     * @return 使用相对坐标的结构模板；权限、维度或会话不匹配时返回 {@code null}
+     */
+    @Nullable
+    public static CompoundTag captureArena(ServerPlayer player, BlockPos expectedCenter) {
+        if (!isAuthorized(player) || !NpcAiTestEnvironment.isTestLevel(player.serverLevel())) return null;
+        TestSession session = TEST_SESSIONS.get(player.getUUID());
+        if (session == null || !session.center().equals(expectedCenter)) return null;
+        StructureTemplate structure = new StructureTemplate();
+        structure.fillFromWorld(player.serverLevel(), arenaOrigin(session),
+                new Vec3i(session.width(), NpcAiTestEnvironment.REGION_HEIGHT, session.length()),
+                false, Blocks.AIR);
+        return structure.save(new CompoundTag());
+    }
+
+    /**
+     * 将场景文件中的方块恢复到玩家新分配的测试场地。
+     *
+     * <p>仅修改当前会话边界内的方块，不复用旧世界坐标，也不恢复运行中的实体。
+     * 未捕获方块快照的新场地保留默认地板。
+     *
+     * @param player 已进入测试场地的玩家
+     * @param snapshot Minecraft 结构模板格式的方块数据
+     */
+    public static void restoreArena(ServerPlayer player, CompoundTag snapshot) {
+        if (snapshot.isEmpty() || !isAuthorized(player)
+                || !NpcAiTestEnvironment.isTestLevel(player.serverLevel())) return;
+        TestSession session = TEST_SESSIONS.get(player.getUUID());
+        if (session == null) return;
+        StructureTemplate structure = new StructureTemplate();
+        structure.load(player.registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK),
+                snapshot.copy());
+        Vec3i size = structure.getSize();
+        if (size.getX() < NpcAiTestEnvironment.MIN_ARENA_SIZE
+                || size.getX() > NpcAiTestEnvironment.MAX_ARENA_SIZE
+                || size.getZ() < NpcAiTestEnvironment.MIN_ARENA_SIZE
+                || size.getZ() > NpcAiTestEnvironment.MAX_ARENA_SIZE
+                || size.getY() != NpcAiTestEnvironment.REGION_HEIGHT) {
+            throw new IllegalArgumentException("测试场景方块快照尺寸超出场地范围");
+        }
+        ServerLevel level = player.serverLevel();
+        BlockPos origin = session.center().offset(-size.getX() / 2, 0, -size.getZ() / 2);
+        BlockPos last = origin.offset(size).offset(-1, -1, -1);
+        BlockPos arenaOrigin = arenaOrigin(session);
+        BlockPos arenaLast = arenaOrigin.offset(session.width() - 1,
+                NpcAiTestEnvironment.REGION_HEIGHT - 1, session.length() - 1);
+        // 快照不保存空气，先清空整个区域才能保留被挖掉的地板和全空场地。
+        for (BlockPos pos : BlockPos.betweenClosed(origin, last)) {
+            if (NpcAiTestEnvironment.isEditable(session.region(), pos) && !level.getBlockState(pos).isAir()) {
+                level.setBlock(pos, Blocks.AIR.defaultBlockState(), 2);
+            }
+        }
+        structure.placeInWorld(level, origin, origin, new StructurePlaceSettings()
+                        .setIgnoreEntities(true).setBoundingBox(BoundingBox.fromCorners(arenaOrigin, arenaLast)),
+                level.random, 2);
+    }
+
+    private static BlockPos arenaOrigin(TestSession session) {
+        return BlockPos.containing(session.region().minX, session.region().minY, session.region().minZ);
     }
 
     /**
@@ -250,6 +319,8 @@ public final class NpcAiTestLevelService {
         }
         ServerLevel level = player.serverLevel();
         switch (action) {
+            case "ai_run", "ai_stop", "ai_toggle", "ai_debug", "ai_target", "ai_step", "ai_step_tick", "ai_breakpoint", "ai_logging", "ai_clear_log" ->
+                    NpcAiTestControl.control(player, action, payload);
             case ACTION_PLACE_BLOCK -> placeBlock(level, session.region(), payload);
             case ACTION_BREAK_BLOCK -> breakBlock(level, session.region(), payload);
             case ACTION_PLACE_NPC -> placeNpc(level, session.region(), payload);
@@ -453,6 +524,7 @@ public final class NpcAiTestLevelService {
                 || !isEditablePosition(region, position, 2.0D)) {
             return;
         }
+        npc.getAiController().manualControl();
         npc.stopNavigation();
         npc.teleportTo(position.x(), position.y(), position.z());
         npc.setDeltaMovement(Vec3.ZERO);
@@ -468,6 +540,7 @@ public final class NpcAiTestLevelService {
             return;
         }
         if (entity instanceof CustomNpc npc) {
+            npc.getAiController().manualControl();
             npc.stopNavigation();
         } else if (entity instanceof Mob mob) {
             mob.getNavigation().stop();
@@ -482,7 +555,7 @@ public final class NpcAiTestLevelService {
         Vec3 position = readPosition(payload);
         if (npc != null && position != null && NpcAiTestEnvironment.isEditable(region, npc.getBoundingBox())
                 && isEditableEntityPosition(region, npc, position)) {
-            npc.navigateTo(position, 1.0D);
+            npc.navigateTo(position, .5D);
         }
     }
 

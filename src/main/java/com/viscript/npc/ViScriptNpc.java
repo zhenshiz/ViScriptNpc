@@ -10,6 +10,7 @@ import com.mojang.logging.LogUtils;
 import com.viscript.npc.gui.edit.NpcEditor;
 import com.viscript.npc.npc.NpcAttachmentType;
 import com.viscript.npc.npc.NpcRegister;
+import com.viscript.npc.npc.ai.data.NpcAiTypes;
 import com.viscript.npc.plugin.IViScriptNpcPlugin;
 import com.viscript.npc.plugin.ViScriptNpcPlugin;
 import net.minecraft.client.Minecraft;
@@ -29,16 +30,14 @@ public class ViScriptNpc {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public ViScriptNpc(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
+        // Vec3 is used by the LDLib2 blackboard. Register its codec before any graph can
+        // deserialize a variable declaration, otherwise the saved default value is dropped.
+        NpcAiTypes.register();
         NpcRegister.ENTITY_TYPES.register(modEventBus);
         NpcAttachmentType.ATTACHMENT_TYPES.register(modEventBus);
-        PlayerUIMenuType.register(NpcEditor.EDITOR_ID, ignored -> player -> {
+        PlayerUIMenuType.register(id("editor"), ignored -> player -> {
             if (player.level().isClientSide) {
-                ModularUI modularUI = new ModularUI(UI.of(EditorWindow.open(NpcEditor.EDITOR_ID, NpcEditor::new)))
-                        .shouldCloseOnKeyInventory(false);
-                if (!Platform.isDevEnv()) {
-                    modularUI.shouldCloseOnEsc(false);
-                }
-                return modularUI;
+                return com.viscript.npc.gui.edit.NpcEditorUiFactory.create();
             }
             return new ModularUI(UI.empty());
         });

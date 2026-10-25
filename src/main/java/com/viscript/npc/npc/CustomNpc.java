@@ -69,6 +69,15 @@ import java.util.stream.Collectors;
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class CustomNpc extends PathfinderMob {
+    private final com.viscript.npc.npc.ai.navigation.NpcNavigation npcNavigation =
+            new com.viscript.npc.npc.ai.navigation.NpcNavigation(this);
+
+    public com.viscript.npc.npc.ai.navigation.NpcNavigation getNpcNavigation() { return npcNavigation; }
+
+    public void setMoveControlForAi(MoveControl control) { moveControl = control; }
+    private final com.viscript.npc.npc.ai.runtime.NpcAiController aiController =
+            new com.viscript.npc.npc.ai.runtime.NpcAiController(this);
+    public com.viscript.npc.npc.ai.runtime.NpcAiController getAiController() { return aiController; }
     public static Set<String> lootTableKeys = Set.of();
     public static Set<String> factionIds = Set.of();
 
@@ -105,6 +114,9 @@ public class CustomNpc extends PathfinderMob {
     public void tick() {
         if (!level().isClientSide()) {
             updateAiState();
+            aiController.tick();
+            setNoAi(!getNpcAI().isEnabled() || !aiController.canTickNavigation());
+            if (getNpcAI().isEnabled() && isAlive() && aiController.canTickNavigation()) npcNavigation.tick();
         }
         super.tick();
         if (!level().isClientSide()) {
@@ -122,9 +134,10 @@ public class CustomNpc extends PathfinderMob {
     private void updateAiState() {
         NpcAI ai = getNpcAI();
         if (!ai.isEnabled() && (!isNoAi() || !navigation.isDone() || moveControl.hasWanted())) {
+            aiController.cancel();
             stopNavigation();
         }
-        setNoAi(!ai.isEnabled());
+        setNoAi(!ai.isEnabled() || !aiController.canTickNavigation());
         setNoGravity(getNpcBasicsSetting().isNoGravity());
     }
 
@@ -136,17 +149,19 @@ public class CustomNpc extends PathfinderMob {
      * 此导航不会挖掘或放置方块，也不会将破坏障碍、搭桥视为可用路线。
      *
      * @param target 世界坐标，三个分量均须为有限数
-     * @param speedModifier 相对于 NPC 移动速度属性的正数倍率
+     * @param movementSpeed 正数移动速度属性值，由本次导航直接使用
      * @return 已接受路径时返回 {@code true}；客户端、AI 关闭、实体死亡或参数无效时返回 {@code false}
      */
-    public boolean navigateTo(Vec3 target, double speedModifier) {
+    public boolean navigateTo(Vec3 target, double movementSpeed) {
         if (level().isClientSide() || !isAlive() || !getNpcAI().isEnabled()
                 || !Double.isFinite(target.x) || !Double.isFinite(target.y) || !Double.isFinite(target.z)
-                || !Double.isFinite(speedModifier) || speedModifier <= 0) {
+                || target.distanceToSqr(position()) > 48 * 48
+                || !Double.isFinite(movementSpeed) || movementSpeed <= 0) {
             return false;
         }
         updateAiState();
-        return navigation.moveTo(navigation.createPath(target.x, target.y, target.z, 0), speedModifier);
+        aiController.manualControl();
+        return npcNavigation.request(target, movementSpeed, .75);
     }
 
     /**
@@ -157,13 +172,7 @@ public class CustomNpc extends PathfinderMob {
             return;
         }
         navigation.stop();
-        moveControl = new MoveControl(this);
-        setSpeed(0);
-        setXxa(0);
-        setYya(0);
-        setZza(0);
-        setJumping(false);
-        setDeltaMovement(Vec3.ZERO);
+        npcNavigation.cancel();
     }
 
     @Override
@@ -272,7 +281,6 @@ public class CustomNpc extends PathfinderMob {
         //NPC属性
         NpcAttributes npcAttributes = getNpcAttributes();
         this.setAttributeBaseValue(Attributes.MAX_HEALTH, npcAttributes.getMaxHealth());
-        this.setAttributeBaseValue(Attributes.MOVEMENT_SPEED, npcAttributes.getMovementSpeed());
         this.setAttributeBaseValue(Attributes.KNOCKBACK_RESISTANCE, npcAttributes.getResistanceConfig().getKnockback());
         //防御
         this.setAttributeBaseValue(Attributes.ARMOR, npcAttributes.getDefenseConfig().getArmor());
@@ -378,7 +386,14 @@ public class CustomNpc extends PathfinderMob {
     @Override
     public void die(DamageSource source) {
         if (NeoForge.EVENT_BUS.post(new NpcEvent.Death(this, source)).isCanceled()) return;
+        aiController.cancel();
         super.die(source);
+    }
+
+    @Override
+    public void remove(RemovalReason reason) {
+        if (!level().isClientSide()) aiController.cancel();
+        super.remove(reason);
     }
 
     @Override

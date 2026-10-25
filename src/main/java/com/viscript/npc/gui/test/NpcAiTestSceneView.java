@@ -2,6 +2,7 @@ package com.viscript.npc.gui.test;
 
 import com.lowdragmc.lowdraglib2.Platform;
 import com.lowdragmc.lowdraglib2.editor.ui.View;
+import com.viscript.npc.gui.edit.NpcEditor;
 import com.lowdragmc.lowdraglib2.gui.texture.Icons;
 import com.lowdragmc.lowdraglib2.gui.ui.UIElement;
 import com.lowdragmc.lowdraglib2.gui.ui.data.Horizontal;
@@ -66,6 +67,9 @@ public final class NpcAiTestSceneView extends View {
     private boolean draggingEntity;
     private long lastNpcDragTime;
     private boolean displayedTestLevel;
+    private int selectedPendingTicks;
+    private boolean selectedSeen;
+    private boolean sceneWindowOpened;
     @Nullable
     private RealLevelSceneViewport viewport;
 
@@ -77,6 +81,7 @@ public final class NpcAiTestSceneView extends View {
     public NpcAiTestSceneView(NpcTestSceneProject project) {
         super(ViScriptNpc.MOD_ID + ".editor.view.ai_test");
         this.project = project;
+        selectedEntityId = project.runtimeNpcId;
         runtimeNpcListRevision = ViScriptNpcClientUtil.getNpcAiTestRuntimeNpcRevision();
         toolboxView = new NpcAiTestToolboxView(this);
         inspectorView = new NpcAiTestInspectorView(this);
@@ -98,6 +103,9 @@ public final class NpcAiTestSceneView extends View {
 
     @Override
     public void screenTick() {
+        com.viscript.npc.gui.ai.AiClientDebug.select(selectedEntityId);
+        com.viscript.npc.gui.ai.AiClientDebug.poll();
+        if (Minecraft.getInstance().level != null && Minecraft.getInstance().level.getGameTime() % 5 == 0) toolboxView.updateStatus();
         super.screenTick();
         boolean testLevelActive = isTestLevelActive();
         if (testLevelActive != displayedTestLevel) {
@@ -108,7 +116,11 @@ public final class NpcAiTestSceneView extends View {
         if (selectedEntityId >= 0) {
             Entity entity = Minecraft.getInstance().level == null
                     ? null : Minecraft.getInstance().level.getEntity(selectedEntityId);
-            if (entity == null || entity.isRemoved()) {
+            if (entity != null) {
+                selectedSeen = true;
+                if (viewport != null) viewport.setHighlightedEntityId(selectedEntityId);
+            }
+            if ((entity == null && (selectedSeen || ++selectedPendingTicks > 100)) || (entity != null && entity.isRemoved())) {
                 selectedEntityId = -1;
                 if (viewport != null) {
                     viewport.setHighlightedEntityId(-1);
@@ -191,6 +203,63 @@ public final class NpcAiTestSceneView extends View {
         return inspectorView;
     }
 
+    /**
+     * 将场景、工具和检查器一起放入置顶的系统窗口。
+     *
+     * @param editor 拥有场景工程和视图停靠位置的编辑器
+     * @return 系统窗口已打开时返回 {@code true}；无法创建时保留原停靠布局
+     */
+    public boolean openWindow(NpcEditor editor) {
+        var floating = editor.getFloatingViews();
+        var window = floating.windowOf(this);
+        if (window != null) return true;
+        // 三个视图共用场景状态，只允许作为一个工具窗口移出。
+        setFloatable(true);
+        try {
+            if (!floating.floatView(this)) return false;
+        } finally {
+            setFloatable(false);
+        }
+        window = floating.windowOf(this);
+        if (window == null) {
+            floating.dockBack(this);
+            return false;
+        }
+        var columns = window.rootWindow().splitStyle(style -> style.percentage(76))
+                .splitNew(org.appliedenergistics.yoga.YogaEdge.RIGHT);
+        var left = columns.getFirst().splitStyle(style -> style.percentage(82))
+                .splitNew(org.appliedenergistics.yoga.YogaEdge.BOTTOM);
+        left.getSecond().getLeftTop().addView(toolboxView);
+        columns.getSecond().getLeftTop().addView(inspectorView);
+        window.getRoot().addEventListener(UIEvents.KEY_DOWN, event -> {
+            if (event.modifiers != 0) return;
+            for (UIElement focused = event.target; focused != null; focused = focused.getParent()) {
+                if (focused instanceof TextField) return;
+            }
+            if (handleToolbarShortcut(event.keyCode)) {
+                event.hasHandler = true;
+                event.stopPropagation();
+            }
+        });
+        if (!sceneWindowOpened) {
+            window.window().setSize(Math.max(1000, window.window().getWindowWidth()),
+                    Math.max(720, window.window().getWindowHeight()));
+            sceneWindowOpened = true;
+        }
+        window.setAlwaysOnTop(true);
+        return true;
+    }
+
+    private void toggleWindow() {
+        if (!(getEditor() instanceof NpcEditor editor)) return;
+        var floating = editor.getFloatingViews();
+        var window = floating.windowOf(this);
+        if (window != null) {
+            floating.closeWindow(window);
+            if (editor.getWindow() != null) editor.getWindow().showEditor(editor);
+        } else openWindow(editor);
+    }
+
     private void rebuild() {
         clearAllChildren();
         viewport = null;
@@ -253,6 +322,28 @@ public final class NpcAiTestSceneView extends View {
         updateStatus();
     }
 
+    /**
+     * 在已打开的测试场景中执行数字键对应的工具栏操作。
+     *
+     * @param keyCode GLFW 按键编码
+     * @return 按键对应当前可用的工具栏操作时返回 {@code true}
+     */
+    public boolean handleToolbarShortcut(int keyCode) {
+        if (!displayedTestLevel || !hasParent()) return false;
+        int slot = keyCode == GLFW.GLFW_KEY_0 ? 9 : keyCode - GLFW.GLFW_KEY_1;
+        if (slot < 0 || slot >= 10) return false;
+        activateToolbarSlot(slot);
+        return true;
+    }
+
+    private void activateToolbarSlot(int slot) {
+        if (slot < Tool.values().length) selectTool(Tool.values()[slot]);
+        else if (slot == 7 && getEditor() instanceof com.viscript.npc.gui.edit.NpcEditor editor) {
+            editor.withTestSceneSnapshot(() -> RPCPacketDistributor.rpcToServer(C2SPayload.LEAVE_NPC_AI_TEST));
+        }
+        else com.viscript.npc.gui.ai.AiClientDebug.command(slot == 8 ? "ai_run" : "ai_stop", getSelectedNpcId());
+    }
+
     private void requestRuntimeNpcList() {
         runtimeNpcListLoading = true;
         ViScriptNpcClientUtil.clearNpcAiTestRuntimeNpcs();
@@ -287,6 +378,12 @@ public final class NpcAiTestSceneView extends View {
             case PLACE_NPC -> sendPositionAction(NpcAiTestLevelService.ACTION_PLACE_NPC, pick, true);
             case PLACE_ENTITY -> sendPositionAction(NpcAiTestLevelService.ACTION_PLACE_ENTITY, pick, false);
             case PLACE_PLAYER -> sendPositionAction(NpcAiTestLevelService.ACTION_PLACE_PLAYER, pick, false);
+            case TARGET -> {
+                CompoundTag payload = new CompoundTag();
+                payload.putInt("entityId", getSelectedNpcId());
+                payload.putInt("targetId", pick.entity() == null ? -1 : pick.entity().getId());
+                sendAction("ai_target", payload);
+            }
             case SELECT -> {
             }
         }
@@ -369,7 +466,12 @@ public final class NpcAiTestSceneView extends View {
         }
     }
 
-    private static void sendAction(String action, CompoundTag payload) {
+    private void sendAction(String action, CompoundTag payload) {
+        if (action.equals(NpcAiTestLevelService.ACTION_PLACE_BLOCK)
+                || action.equals(NpcAiTestLevelService.ACTION_BREAK_BLOCK)
+                || action.equals(NpcAiTestLevelService.ACTION_RESIZE_ARENA)) {
+            project.markSceneBlocksDirty();
+        }
         RPCPacketDistributor.rpcToServer(C2SPayload.APPLY_NPC_AI_TEST_ACTION, action, payload);
     }
 
@@ -444,11 +546,12 @@ public final class NpcAiTestSceneView extends View {
 
     private enum Tool {
         SELECT("select", "viscript_npc.editor.ai_test.tool.select", 62.0F),
+        PLACE_BLOCK("place_block", "viscript_npc.editor.ai_test.tool.place_block", 70.0F),
+        BREAK_BLOCK("break_block", "viscript_npc.editor.ai_test.tool.break_block", 70.0F),
+        TARGET("target", "viscript_npc.editor.ai_test.tool.target", 22.0F),
         PLACE_NPC("place_npc", "viscript_npc.editor.ai_test.tool.place_npc", 70.0F),
         PLACE_ENTITY("place_entity", "viscript_npc.editor.ai_test.tool.place_entity", 70.0F),
-        PLACE_PLAYER("place_player", "viscript_npc.editor.ai_test.tool.place_player", 70.0F),
-        PLACE_BLOCK("place_block", "viscript_npc.editor.ai_test.tool.place_block", 70.0F),
-        BREAK_BLOCK("break_block", "viscript_npc.editor.ai_test.tool.break_block", 70.0F);
+        PLACE_PLAYER("place_player", "viscript_npc.editor.ai_test.tool.place_player", 70.0F);
 
         private final String id;
         private final String translationKey;
@@ -485,19 +588,15 @@ public final class NpcAiTestSceneView extends View {
 
             UIElement toolbar = new UIElement();
             toolbar.setId("npc_ai_test_toolbar");
-            toolbar.addClass("panel_bg");
-            toolbar.layout(layout -> layout.widthPercent(100).height(22).paddingAll(2)
+            toolbar.layout(layout -> layout.widthPercent(100).minHeight(22).paddingAll(1).flexWrap(dev.vfyjxf.taffy.style.FlexWrap.WRAP)
                     .flexDirection(FlexDirection.ROW).alignItems(AlignItems.CENTER).gapAll(2));
             for (Tool tool : Tool.values()) {
                 Tab tab = new Tab();
                 tab.setId("npc_ai_test_tool_" + tool.id);
-                tab.setText(Component.translatable(tool.translationKey));
+                tab.setText(Component.empty());
+                com.viscript.npc.gui.ai.AiIcons.decorate(tab, tool.id);
+                decorateShortcut(tab, tool.translationKey, tool.ordinal());
                 tab.setSelected(tool == sceneView.activeTool);
-                tab.layout(layout -> {
-                    layout.width(tool.width).height(18);
-                    layout.minWidth(tool == Tool.SELECT ? 50.0F : 58.0F);
-                    layout.flexGrow(0.0F).flexShrink(1.0F).flexBasis(tool.width);
-                });
                 tab.addEventListener(UIEvents.MOUSE_DOWN, event -> {
                     if (event.button == 0) {
                         sceneView.selectTool(tool);
@@ -510,24 +609,55 @@ public final class NpcAiTestSceneView extends View {
 
             Button exit = new Button();
             exit.setId("npc_ai_test_exit");
-            exit.setText(Component.translatable("viscript_npc.editor.ai_test.exit"));
-            exit.addPreIcon(Icons.CLOSE);
-            exit.layout(layout -> {
-                layout.width(76).minWidth(76).maxWidth(76).height(18).marginLeftAuto();
-                layout.flexGrow(0.0F).flexShrink(0.0F).flexBasis(76.0F);
-            });
+            exit.noText();
+            com.viscript.npc.gui.ai.AiIcons.decorate(exit, "exit");
+            decorateShortcut(exit, "viscript_npc.editor.ai_test.exit", 7);
+            exit.layout(l -> l.marginLeft(4));
             exit.setOnClick(event -> {
                 if (event.button == 0) {
-                    RPCPacketDistributor.rpcToServer(C2SPayload.LEAVE_NPC_AI_TEST);
+                    sceneView.activateToolbarSlot(7);
                 }
             });
             toolbar.addChild(exit);
+            var run = com.viscript.npc.gui.ai.AiGraphView.icon("run", () -> sceneView.activateToolbarSlot(8));
+            decorateShortcut(run, "viscript_npc.ai.tip.run", 8);
+            var pause = com.viscript.npc.gui.ai.AiGraphView.icon("pause", () -> sceneView.activateToolbarSlot(9));
+            decorateShortcut(pause, "viscript_npc.ai.tip.pause", 9);
+            toolbar.addChildren(run, pause);
+            var separateWindow = com.viscript.npc.gui.ai.AiGraphView.icon("scene_window", sceneView::toggleWindow);
+            separateWindow.setId("npc_ai_test_window");
+            separateWindow.style(style -> style.tooltips("viscript_npc.editor.ai_test.window"));
+            toolbar.addChild(separateWindow);
 
             statusLabel = new Label();
             statusLabel.setId("npc_ai_test_status");
-            statusLabel.layout(layout -> layout.widthPercent(100).height(18));
-            addChildren(toolbar, statusLabel);
+            statusLabel.layout(layout -> layout.widthPercent(100).minHeight(9).flexShrink(0));
+            statusLabel.textStyle(style -> style.textWrap(TextWrap.WRAP).adaptiveHeight(true));
+            statusLabel.style(style -> style.tooltips("viscript_npc.editor.ai_test.controls"));
+            var scroller = new ScrollerView();
+            scroller.setId("npc_ai_test_tools_scroller");
+            scroller.scrollerStyle(style -> style.mode(ScrollerMode.VERTICAL));
+            scroller.layout(layout -> layout.widthPercent(100).flex(1).minHeight(0));
+            scroller.viewContainer.layout(layout -> layout.widthPercent(100).gapAll(2));
+            scroller.viewPort.layout(layout -> layout.paddingAll(0));
+            scroller.viewPort.style(style -> style.backgroundTexture(com.lowdragmc.lowdraglib2.gui.texture.IGuiTexture.EMPTY));
+            scroller.viewContainer.addChildren(toolbar, statusLabel);
+            addChild(scroller);
             updateStatus();
+        }
+
+        private void decorateShortcut(UIElement button, String title, int slot) {
+            String key = slot == 9 ? "0" : Integer.toString(slot + 1);
+            button.style(style -> style.tooltips(Component.translatable("viscript_npc.editor.ai_test.shortcut",
+                    Component.translatable(title), key)));
+            button.layout(layout -> layout.height(27).paddingBottom(10));
+            var hint = new Label().setText(key);
+            hint.addClass("npc_ai_test_shortcut");
+            hint.setAllowHitTest(false);
+            hint.layout(layout -> layout.positionType(dev.vfyjxf.taffy.style.TaffyPosition.ABSOLUTE)
+                    .bottom(1).left(1).right(1).height(6));
+            hint.textStyle(style -> style.fontSize(6).textAlignHorizontal(Horizontal.CENTER));
+            button.addChild(hint);
         }
 
         private void selectTool(Tool tool) {
@@ -555,6 +685,16 @@ public final class NpcAiTestSceneView extends View {
             statusLabel.setText(Component.translatable("viscript_npc.editor.ai_test.status",
                     Component.translatable(sceneView.activeTool.translationKey), selected,
                     blocks, fluids, entities));
+            statusLabel.style(style -> style.tooltips("viscript_npc.editor.ai_test.controls"));
+            var debug = com.viscript.npc.gui.ai.AiClientDebug.latest;
+            if (debug.entityId == sceneView.getSelectedNpcId() && !debug.status.isBlank()) {
+                statusLabel.setText(Component.literal(selected + " · " + debug.status + " · " + debug.phase));
+                statusLabel.style(style -> style.tooltips(Component.translatable("viscript_npc.ai.debug",
+                        debug.targetId, debug.navigationStatus, debug.reason,
+                        String.format(java.util.Locale.ROOT, "%.1f", debug.navigationQueueMs),
+                        String.format(java.util.Locale.ROOT, "%.1f", debug.navigationSearchMs), debug.variables.toString())
+                        .append("\n").append(Component.translatable("viscript_npc.ai.debug.perception"))));
+            }
         }
     }
 
@@ -576,6 +716,7 @@ public final class NpcAiTestSceneView extends View {
             }
             addHelp(switch (sceneView.activeTool) {
                 case SELECT -> "viscript_npc.editor.ai_test.scene_settings_help";
+                case TARGET -> "viscript_npc.editor.ai_test.target_help";
                 case PLACE_NPC -> "viscript_npc.editor.ai_test.place_npc_help";
                 case PLACE_ENTITY -> "viscript_npc.editor.ai_test.place_entity_help";
                 case PLACE_PLAYER -> "viscript_npc.editor.ai_test.place_player_help";
@@ -588,7 +729,7 @@ public final class NpcAiTestSceneView extends View {
                 case PLACE_ENTITY -> buildEntityParameters();
                 case PLACE_NPC -> buildNpcParameters();
                 case SELECT -> buildSceneParameters();
-                case PLACE_PLAYER, BREAK_BLOCK -> {
+                case PLACE_PLAYER, BREAK_BLOCK, TARGET -> {
                 }
             }
         }
@@ -730,13 +871,12 @@ public final class NpcAiTestSceneView extends View {
         }
 
         private void addHelp(String translationKey) {
-            Label label = new Label();
-            label.setId("npc_ai_test_tool_help");
-            label.setText(Component.translatable(translationKey));
-            label.textStyle(style -> style.textWrap(TextWrap.HOVER_ROLL));
-            label.setOverflowVisible(false);
-            label.layout(layout -> layout.widthPercent(100).height(18));
-            addChild(label);
+            var help = new UIElement();
+            help.setId("npc_ai_test_tool_help");
+            help.layout(layout -> layout.width(14).height(14));
+            help.style(style -> style.backgroundTexture(com.lowdragmc.lowdraglib2.gui.texture.Icons.INFORMATION)
+                    .tooltips(translationKey));
+            addChild(help);
         }
     }
 }
