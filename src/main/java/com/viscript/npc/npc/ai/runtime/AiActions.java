@@ -40,7 +40,7 @@ public final class AiActions {
 
     public static void cancel(AiExecution execution, AiExecution.Frame frame) {
         if (frame.node == null) return;
-        if (frame.node.type.equals("navigate") || frame.node.type.equals("approach") || frame.node.type.equals("jump") || frame.node.type.equals("patrol"))
+        if (AiOperations.isMovement(frame.node.type))
             execution.cancelNavigation(frame);
         Executor extension = EXTENSIONS.get(frame.node.type);
         if (extension != null) extension.cancel(execution, frame);
@@ -97,6 +97,12 @@ public final class AiActions {
                     output(e, n, value); return AiStatus.SUCCESS;
                 }
                 case "clear_target": npc.setTarget(null); return AiStatus.SUCCESS;
+                case "set_home":
+                    e.stopNavigation();
+                    npc.getAiController().guard.setHome(e.flag(n, "use_current") ? npc.position() : e.resolve(n, "position").position);
+                    return AiStatus.SUCCESS;
+                case "home_position": output(e, n, AiValue.position(npc.getAiController().guard.home())); return AiStatus.SUCCESS;
+                case "number_math", "vector_math", "random_number": output(e, n, AiCalculations.calculate(e, n)); return AiStatus.SUCCESS;
                 case "position": {
                     String origin = e.text(n, "origin");
                     if (origin.equals("target") && !hasTarget) return AiStatus.FAILURE;
@@ -108,26 +114,56 @@ public final class AiActions {
                     e.local.put(e.text(n, "output"), AiValue.position(position));
                     return AiStatus.SUCCESS;
                 }
-                case "navigate", "approach": {
-                    if (n.type.equals("approach") && !hasTarget) { e.cancelNavigation(f); return AiStatus.FAILURE; }
+                case "navigate", "approach", "return_home": {
+                    boolean approaching = n.type.equals("approach");
+                    if (approaching && !hasTarget) { e.cancelNavigation(f); return AiStatus.FAILURE; }
                     double range = Math.max(.55, e.number(n, "range"));
-                    Vec3 goal = n.type.equals("approach") ? target.position() : e.resolve(n, "position").position;
-                    if (npc.position().distanceTo(goal) <= range) { e.cancelNavigation(f); return AiStatus.SUCCESS; }
+                    Vec3 goal = n.type.equals("return_home") ? npc.getAiController().guard.home()
+                            : approaching ? npc.getAiController().guard.pursuitPosition(target) : e.resolve(n, "position").position;
+                    if (n.type.equals("return_home")) npc.getAiController().guard.beginReturn();
+                    if (npc.position().distanceTo(goal) <= range) {
+                        e.cancelNavigation(f);
+                        if (n.type.equals("return_home")) npc.getAiController().guard.arrived();
+                        return AiStatus.SUCCESS;
+                    }
                     if (f.age > e.ticks(n)) { e.cancelNavigation(f); return failure(e, "move_timeout"); }
                     if (f.started && !e.ownsNavigation(f)) return failure(e, "navigation_superseded");
-                    if (!f.started || (n.type.equals("approach") && f.age % 10 == 0
+                    if (!f.started || (approaching && f.age % 10 == 0
                             && npc.getNpcNavigation().status() != NavigationStatus.COMPUTING
                             && f.state instanceof Vec3 old && old.distanceToSqr(goal) > 1)) {
                         e.claimNavigation(f);
-                        if (!npc.getNpcNavigation().request(goal, e.number(n, "speed"), range)) return failure(e, "navigation_rejected");
+                        if (!npc.getNpcNavigation().request(goal, e.number(n, "speed"), range, navigationOptions(e, n))) return failure(e, "navigation_rejected");
                         f.started = true;
                         f.state = goal;
                     }
                     return switch (npc.getNpcNavigation().status()) {
-                        case ARRIVED -> AiStatus.SUCCESS;
+                        // 动态目标已经离开旧终点时重新请求，不能误报接近成功。
+                        case ARRIVED -> { f.started = false; yield AiStatus.RUNNING; }
                         case FAILED, CANCELLED -> failure(e, npc.getNpcNavigation().reason());
                         default -> AiStatus.RUNNING;
                     };
+                }
+                case "retreat", "keep_distance": {
+                    if (!hasTarget) { e.cancelNavigation(f); return failure(e, "invalid_target"); }
+                    double min = n.type.equals("retreat") ? e.number(n, "range") : e.number(n, "min_distance");
+                    double max = n.type.equals("retreat") ? Double.POSITIVE_INFINITY : e.number(n, "max_distance");
+                    if (min > max) return failure(e, "distance_range");
+                    double distance = npc.distanceTo(target);
+                    if (distance >= min && distance <= max) { e.cancelNavigation(f); return AiStatus.SUCCESS; }
+                    if (f.age > e.ticks(n)) { e.cancelNavigation(f); return failure(e, "move_timeout"); }
+                    if (f.started && !e.ownsNavigation(f)) return failure(e, "navigation_superseded");
+                    if (!f.started || f.age % 10 == 0 && npc.getNpcNavigation().status() != NavigationStatus.COMPUTING) {
+                        Vec3 direction = npc.position().subtract(target.position()).multiply(1, 0, 1).normalize();
+                        if (direction.lengthSqr() < .001) direction = new Vec3(1, 0, 0);
+                        double radius = n.type.equals("retreat") ? min + .75 : (min + max) / 2;
+                        Vec3 desired = target.position().add(direction.scale(radius));
+                        Vec3 goal = groundGoal(npc, desired);
+                        if (goal == null) { e.cancelNavigation(f); return failure(e, "no_safe_position"); }
+                        e.claimNavigation(f);
+                        if (!npc.getNpcNavigation().request(goal, e.number(n, "speed"), .6, navigationOptions(e, n))) return failure(e, "navigation_rejected");
+                        f.started = true;
+                    }
+                    return npc.getNpcNavigation().status() == NavigationStatus.FAILED ? failure(e, npc.getNpcNavigation().reason()) : AiStatus.RUNNING;
                 }
                 case "patrol": {
                     double radius = Math.clamp(e.number(n, "patrol_radius"), 0, 32);
@@ -141,15 +177,14 @@ public final class AiActions {
                             var column = net.minecraft.core.BlockPos.containing(anchor.add(Math.cos(angle) * distance, 0, Math.sin(angle) * distance));
                             for (int dy = 2; dy >= -2; dy--) {
                                 var feet = column.above(dy);
-                                if (level.getBlockState(feet.below()).isFaceSturdy(level, feet.below(), net.minecraft.core.Direction.UP)
-                                        && level.noCollision(npc, npc.getBoundingBox().move(Vec3.atBottomCenterOf(feet).subtract(npc.position())))) {
+                                if (npc.getNpcNavigation().canStandAt(Vec3.atBottomCenterOf(feet))) {
                                     goal = Vec3.atBottomCenterOf(feet); break;
                                 }
                             }
                         }
                         if (goal == null) return AiStatus.FAILURE;
                         e.claimNavigation(f);
-                        if (!npc.getNpcNavigation().request(goal, e.number(n, "speed"), .75)) return failure(e, "navigation_rejected");
+                        if (!npc.getNpcNavigation().request(goal, e.number(n, "speed"), .75, navigationOptions(e, n))) return failure(e, "navigation_rejected");
                         f.started = true;
                     }
                     if (!e.ownsNavigation(f)) return failure(e, "navigation_superseded");
@@ -253,6 +288,19 @@ public final class AiActions {
     private static void output(AiExecution e, com.viscript.npc.npc.ai.data.AiNodeData node, AiValue value) {
         String id = e.text(node, "output");
         if (!id.isBlank()) e.local.put(id, value.copy());
+    }
+    private static com.viscript.npc.npc.ai.navigation.NavigationOptions navigationOptions(AiExecution e, com.viscript.npc.npc.ai.data.AiNodeData node) {
+        return new com.viscript.npc.npc.ai.navigation.NavigationOptions(e.flag(node, "open_doors"), e.flag(node, "swim"), e.flag(node, "climb"));
+    }
+    private static Vec3 groundGoal(com.viscript.npc.npc.CustomNpc npc, Vec3 desired) {
+        var level = (ServerLevel) npc.level();
+        var column = net.minecraft.core.BlockPos.containing(desired);
+        if (level.getChunkSource().getChunkNow(column.getX() >> 4, column.getZ() >> 4) == null) return null;
+        for (int dy = 2; dy >= -3; dy--) {
+            var feet = column.above(dy); var position = Vec3.atBottomCenterOf(feet);
+            if (npc.getNpcNavigation().canStandAt(position)) return position;
+        }
+        return null;
     }
     private static AiValue defaultOutput(com.viscript.npc.npc.ai.data.AiNodeData node) {
         return switch (AiOperations.outputType(node)) {

@@ -8,7 +8,7 @@ import java.util.*;
 
 /** 模组内置学习示例；复制后可独立编辑，与玩家文件使用相同的执行器。 */
 public final class AiExamples {
-    public static final List<String> NAMES = List.of("patrol", "pursue_melee", "pursue_ranged", "melee", "ranged", "jump_slash");
+    public static final List<String> NAMES = List.of("patrol", "return_home", "approach", "retreat", "keep_distance", "pursue_melee", "pursue_ranged", "melee", "ranged", "jump_slash", "skill_rotation");
     public static final List<String> TREE_NAMES = List.of("guard", "ranged_guard", "patroller");
 
     public static AiProgram action(String name) {
@@ -18,13 +18,22 @@ public final class AiExamples {
             case "melee", "ranged" -> {
                 b.parameter("damage", AiValue.number(name.equals("melee") ? 4 : 3));
                 b.parameter("attack_interval_seconds", AiValue.number(.6));
-                b.root(b.node("sequence", b.node("look"), b.node("swing"), b.bind(b.node(name), "damage", "damage"),
+                b.root(b.node("sequence", b.bind(b.node(name), "damage", "damage"),
                         b.bind(b.node("wait"), "seconds", "attack_interval_seconds")));
             }
             case "patrol" -> {
                 b.parameter("patrol_radius", AiValue.number(6));
                 b.parameter("speed", AiValue.number(.5));
                 b.root(b.bind(b.bind(b.node("patrol"), "patrol_radius", "patrol_radius"), "speed", "speed"));
+            }
+            case "return_home", "approach", "retreat", "keep_distance" -> {
+                b.parameter("speed", AiValue.number(.5));
+                b.root(b.bind(b.node(name), "speed", "speed"));
+            }
+            case "skill_rotation" -> {
+                var heavy = b.node("weight", b.call("jump_slash")).input("weight", AiValue.number(1));
+                var light = b.node("weight", b.call("melee")).input("weight", AiValue.number(3));
+                b.root(b.node("weighted_selector", light, heavy));
             }
             case "pursue_melee", "pursue_ranged" -> {
                 boolean melee = name.equals("pursue_melee");
@@ -33,7 +42,7 @@ public final class AiExamples {
                 b.parameter("attack_interval_seconds", AiValue.number(.6));
                 var approach = b.bind(b.node("approach").input("range", AiValue.number(melee ? 1.8 : 12)), "speed", "speed");
                 var attack = b.bind(b.node(melee ? "melee" : "ranged"), "damage", "damage");
-                b.root(b.node("sequence", approach, b.node("look"), b.node("swing"), attack,
+                b.root(b.node("sequence", approach, attack,
                         b.bind(b.node("wait"), "seconds", "attack_interval_seconds")));
             }
             case "jump_slash" -> {
@@ -66,8 +75,9 @@ public final class AiExamples {
         if (name.equals("guard") || name.equals("ranged_guard")) {
             var combat = b.node("reactive_sequence", b.node("target_exists"),
                     b.call(name.equals("guard") ? "pursue_melee" : "pursue_ranged"));
-            var decision = b.node("reactive_selector", combat, b.call("patrol"));
-            b.root(b.node("sense_targets", decision).input("filter", AiValue.choice("player", java.util.List.of("hostile", "player", "living"))));
+            var returning = b.node("reactive_sequence", b.node("returning_home"), b.call("return_home"));
+            var decision = b.node("reactive_selector", returning, combat, b.call("patrol"));
+            b.root(b.node("guard_area", decision).input("filter", AiValue.choice("player", java.util.List.of("hostile", "player", "living"))));
         } else if (name.equals("patroller")) b.root(b.call("patrol"));
         else if (name.equals("melee") || name.equals("ranged") || name.equals("jump_slash")) {
             AiNodeData attack = b.call(name);

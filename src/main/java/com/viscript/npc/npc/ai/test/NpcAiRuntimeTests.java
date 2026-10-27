@@ -173,14 +173,94 @@ public final class NpcAiRuntimeTests {
         for (String name : AiExamples.NAMES) {
             var p = new AiProgram();
             p.deserializeNBT(test.getLevel().registryAccess(), AiExamples.action(name).serializeNBT(test.getLevel().registryAccess()));
-            test.assertTrue(AiValidation.validate(p, ignored -> null).isEmpty(), "example validates: " + name);
+            test.assertTrue(AiValidation.validate(p, NpcActionFiles::load).isEmpty(), "example validates: " + name);
             test.assertTrue(p.nodes.size() == AiExamples.action(name).nodes.size(), "all action nodes round trip");
+            if (List.of("melee", "ranged", "pursue_melee", "pursue_ranged").contains(name))
+                test.assertTrue(p.nodes.stream().noneMatch(node -> node.type.equals("look") || node.type.equals("swing")),
+                        "attack examples leave turning and swinging to the attack executor: " + name);
         }
         for (String name : AiExamples.TREE_NAMES) {
             var p = AiExamples.tree(name).copy(test.getLevel().registryAccess());
             var dependencies = NpcAiPublication.readDependencies(NpcAiPublication.bundle(p, NpcActionFiles::load));
             test.assertTrue(AiValidation.validate(p, dependencies::get).isEmpty(), "bundle validates: " + name);
         }
+        test.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void resultOverridesPreserveRunningAndOrdinaryParentFlow(GameTestHelper test) {
+        var npc = npc(test);
+        for (String type : List.of("force_success", "force_failure")) {
+            var p = action();
+            var result = n(p, type, n(p, "wait").input("seconds", AiValue.number(.15)));
+            root(p, n(p, "sequence", type.equals("force_success") ? result : n(p, "invert", result), probe(p, "after")));
+            var bb = new HashMap<String, AiValue>();
+            var e = new AiExecution(npc, p, bb, Map.of(), ignored -> null);
+            test.assertTrue(e.tick() == AiStatus.RUNNING && bb.isEmpty(), "result override waits for its child: " + type);
+            test.assertTrue(e.tick() == AiStatus.RUNNING && bb.isEmpty(), "running is never converted: " + type);
+            test.assertTrue(e.tick() == AiStatus.SUCCESS && bb.get("after").number == 1, "parent handles the ordinary overridden result: " + type);
+            for (String leaf : List.of("success", "failure")) {
+                var terminal = action(); root(terminal, n(terminal, type, n(terminal, leaf)));
+                var expected = type.equals("force_success") ? AiStatus.SUCCESS : AiStatus.FAILURE;
+                test.assertTrue(new AiExecution(npc, terminal, new HashMap<>(), Map.of(), ignored -> null).tick() == expected,
+                        "either ordinary terminal result can be overridden: " + type + "/" + leaf);
+            }
+        }
+        var p = action(); root(p, n(p, "sequence", n(p, "force_success", n(p, "failure")), probe(p, "after")));
+        var bb = new HashMap<String, AiValue>();
+        test.assertTrue(new AiExecution(npc, p, bb, Map.of(), ignored -> null).tick() == AiStatus.SUCCESS && bb.containsKey("after"),
+                "overriding failure to success continues the sequence");
+        test.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void explicitFinishBypassesInternalDecoratorsAndReturnsToCaller(GameTestHelper test) {
+        var npc = npc(test);
+        for (String finish : List.of("finish_success", "finish_failure")) {
+            var expected = finish.equals("finish_success") ? AiStatus.SUCCESS : AiStatus.FAILURE;
+            for (String decorator : List.of("force_success", "force_failure", "invert", "repeat", "until_success", "until_failure")) {
+                var body = action(); root(body, n(body, "sequence", n(body, decorator, n(body, finish)), probe(body, "inside")));
+                var bb = new HashMap<String, AiValue>();
+                test.assertTrue(new AiExecution(npc, body, bb, Map.of(), ignored -> null).tick() == expected && bb.isEmpty(),
+                        "finish skips the rest of its behavior through " + decorator + "/" + finish);
+                var caller = action(); root(caller, n(caller, "sequence",
+                        n(caller, "force_success", n(caller, "call").input("file", AiValue.text("body"))), probe(caller, "outside")));
+                test.assertTrue(new AiExecution(npc, caller, bb, Map.of(), ignored -> body).tick() == AiStatus.SUCCESS
+                                && !bb.containsKey("inside") && bb.get("outside").number == 1,
+                        "caller can override the result and continue after a finished invocation");
+                var inverter = action(); root(inverter, n(inverter, "invert", n(inverter, "call").input("file", AiValue.text("body"))));
+                test.assertTrue(new AiExecution(npc, inverter, new HashMap<>(), Map.of(), ignored -> body).tick()
+                                == (expected == AiStatus.SUCCESS ? AiStatus.FAILURE : AiStatus.SUCCESS),
+                        "caller can invert the returned finish result");
+            }
+        }
+        var body = action(); root(body, n(body, "sequence", probe(body, "entry"), n(body, "finish_success"), probe(body, "inside")));
+        var caller = action(); root(caller, n(caller, "repeat", n(caller, "call").input("file", AiValue.text("body"))));
+        var bb = new HashMap<String, AiValue>(); var repeated = new AiExecution(npc, caller, bb, Map.of(), ignored -> body);
+        test.assertTrue(repeated.tick() == AiStatus.RUNNING && repeated.tick() == AiStatus.SUCCESS
+                        && bb.get("entry").number == 2 && !bb.containsKey("inside"),
+                "caller repetition creates another invocation after an explicit finish");
+        test.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void approachAcceptsFriendlyRecipientsWithoutChangingTarget(GameTestHelper test) {
+        var npc = npc(test);
+        var friend = test.spawn(NpcRegister.CUSTOM_NPC.get(), new BlockPos(3, 1, 2));
+        friend.getAiController().manualControl();
+        npc.getNpcViScriptTeamIntegration().setFactionId("__ai_approach_friendly__");
+        friend.getNpcViScriptTeamIntegration().setFactionId("__ai_approach_friendly__");
+        com.viscript.npc.compat.team.NpcFactionBridge.applyConfiguredFaction(npc);
+        com.viscript.npc.compat.team.NpcFactionBridge.applyConfiguredFaction(friend);
+        test.assertTrue(!com.viscript.npc.compat.team.NpcFactionBridge.canHurt(npc, friend), "recipient is friendly");
+        var p = action(); var move = n(p, "approach").input("recipient", AiValue.entity(friend)); root(p, move);
+        var restored = new AiProgram(); restored.deserializeNBT(npc.registryAccess(), p.serializeNBT(npc.registryAccess()));
+        test.assertTrue(AiValidation.validate(restored, ignored -> null).isEmpty(), "approach definition validates after a round trip");
+        test.assertTrue(new AiExecution(npc, restored, new HashMap<>(), Map.of(), ignored -> null).tick() == AiStatus.SUCCESS
+                && npc.getTarget() == null, "approaching a friend succeeds in range without setting a combat target");
+        move.input("recipient", AiValue.entity(new AiEntityRef()));
+        test.assertTrue(new AiExecution(npc, p, new HashMap<>(), Map.of(), ignored -> null).tick() == AiStatus.FAILURE,
+                "missing recipient fails");
         test.succeed();
     }
 

@@ -53,15 +53,15 @@ public final class NpcAiPerceptionScenario implements UIScenario {
                     var sense = p.node(p.node(p.root).children.getFirst());
                     var selector = p.node(sense.children.getFirst());
                     return window(c).getCurrentEditor() != c.get("perception_original_editor")
-                            && sense.type.equals("sense_targets") && selector.type.equals("reactive_selector") && selector.children.size() == 2
+                            && sense.type.equals("guard_area") && selector.type.equals("reactive_selector") && selector.children.size() == 3
                             && p.node(selector.children.getFirst()).type.equals("reactive_sequence")
-                            && p.node(p.node(selector.children.getFirst()).children.getFirst()).type.equals("target_exists")
-                            && p.node(selector.children.get(1)).literal("file", AiValue.text("")).text.equals("examples/patrol")
-                            && p.node(p.node(selector.children.getFirst()).children.get(1)).literal("file", AiValue.text("")).text.equals("examples/pursue_melee")
-                            && p.nodes.stream().filter(n -> n.type.equals("call")).count() == 2
+                            && p.node(p.node(selector.children.getFirst()).children.getFirst()).type.equals("returning_home")
+                            && p.node(selector.children.get(2)).literal("file", AiValue.text("")).text.equals("examples/patrol")
+                            && p.node(p.node(selector.children.get(1)).children.get(1)).literal("file", AiValue.text("")).text.equals("examples/pursue_melee")
+                            && p.nodes.stream().filter(n -> n.type.equals("call")).count() == 3
                             && AiValidation.validate(p, NpcActionFiles::loadLocal).isEmpty();
                 }).step("选择检测目标条件节点", c -> {
-                    var sense = view(c).model().compile().nodes.stream().filter(n -> n.type.equals("sense_targets")).findFirst().orElseThrow();
+                    var sense = view(c).model().compile().nodes.stream().filter(n -> n.type.equals("guard_area")).findFirst().orElseThrow();
                     c.put("perception_sense_id", sense.id);
                     var b = c.el("#npc_ai_node_" + sense.id).bounds();
                     c.input().mouseDown(b.centerX(), b.centerY(), Keys.MOUSE_LEFT);
@@ -69,7 +69,9 @@ public final class NpcAiPerceptionScenario implements UIScenario {
                 }).ticks(2)
                 .check("组合感知显示圆圈与扇形尺寸表单", c -> c.el("#npc_ai_field_range").element().isDisplayed()
                         && c.el("#npc_ai_field_view_radius").element().isDisplayed()
-                        && c.el("#npc_ai_field_view_angle").element().isDisplayed())
+                        && c.el("#npc_ai_field_view_angle").element().isDisplayed()
+                        && c.el("#npc_ai_field_leash_range").element().isDisplayed()
+                        && c.el("#npc_ai_field_memory_seconds").element().isDisplayed())
                 .step("编辑视野半径", c -> c.el("#npc_ai_value_view_radius").as(TextField.class).setText("", false))
                 .typeInto("#npc_ai_value_view_radius", "8.5").key(Keys.ENTER).ticks(2)
                 .check("自动数字表单写回尺寸", c -> view(c).model().compile().node(c.get("perception_sense_id"))
@@ -107,7 +109,7 @@ public final class NpcAiPerceptionScenario implements UIScenario {
                     var npc = NpcRegister.CUSTOM_NPC.get().create(server.level());
                     npc.moveTo(Vec3.atBottomCenterOf(center.above())); npc.setYHeadRot(180);
                     var p = AiExamples.tree("guard");
-                    var sense = p.nodes.stream().filter(n -> n.type.equals("sense_targets")).findFirst().orElseThrow();
+                    var sense = p.nodes.stream().filter(n -> n.type.equals("guard_area")).findFirst().orElseThrow();
                     sense.input("range", AiValue.number(2)).input("view_radius", AiValue.number(4)).input("view_angle", AiValue.number(90));
                     var dependencies = NpcAiPublication.readDependencies(NpcAiPublication.bundle(p, NpcActionFiles::load));
                     npc.getAiController().preview(p, dependencies); server.level().addFreshEntity(npc);

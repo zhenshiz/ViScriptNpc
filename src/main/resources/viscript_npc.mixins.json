@@ -10,8 +10,7 @@
   "client": [
     "GeoRendererMixin",
     "LivingEntityRenderMixin",
-    "WorldSceneRendererAccessor",
-    "OsWindowHintsMixin"
+    "WorldSceneRendererAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

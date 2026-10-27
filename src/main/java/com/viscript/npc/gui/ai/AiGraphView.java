@@ -299,8 +299,8 @@ public final class AiGraphView extends GraphView {
 
     private static String libraryCategory(String operation) {
         if (AiOperations.get(operation).group().equals("debug")) return "debug";
-        if (Set.of("root", "sequence", "selector", "reactive_sequence", "reactive_selector", "parallel").contains(operation)) return "composite";
-        if (Set.of("invert", "repeat", "until_success", "until_failure", "force_success", "force_failure", "timeout", "cooldown", "sense_targets").contains(operation)) return "decorator";
+        if (Set.of("root", "sequence", "selector", "reactive_sequence", "reactive_selector", "parallel", "weighted_selector").contains(operation)) return "composite";
+        if (Set.of("invert", "repeat", "until_success", "until_failure", "force_success", "force_failure", "timeout", "cooldown", "sense_targets", "guard_area", "weight").contains(operation)) return "decorator";
         if (AiOperations.get(operation).group().equals("condition")) return "condition";
         return "action";
     }
@@ -308,11 +308,11 @@ public final class AiGraphView extends GraphView {
     private static String actionCategory(String operation) {
         return switch (operation) {
             case "find_target", "set_target", "clear_target", "get_entity", "entity_info" -> "entity";
-            case "patrol", "position", "navigate", "approach", "stop", "look", "jump", "wait_ground" -> "movement";
+            case "patrol", "position", "navigate", "approach", "stop", "look", "jump", "wait_ground", "retreat", "keep_distance", "return_home", "set_home", "home_position" -> "movement";
             case "melee", "ranged", "area_damage", "knockback", "swing", "effect" -> "combat";
             case "particle", "sound" -> "presentation";
             case "stage", "branch", "wait" -> "timing";
-            case "set_variable", "success", "failure", "finish_success", "finish_failure", "call" -> "data";
+            case "set_variable", "success", "failure", "finish_success", "finish_failure", "call", "number_math", "vector_math", "random_number" -> "data";
             default -> "other";
         };
     }

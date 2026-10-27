@@ -32,9 +32,13 @@ public final class NpcNavigation {
     private record Completed(long generation, AStarPathFinder.Result result) {}
     private final java.util.concurrent.atomic.AtomicReference<Completed> result = new java.util.concurrent.atomic.AtomicReference<>();
     private static volatile long serverEpoch;
+    private static int lastDispatchCount;
+    public static int lastDispatchCount() { return lastDispatchCount; }
     private NavigationStatus status = NavigationStatus.IDLE;
     private String reason = "";
     private Vec3 goal = Vec3.ZERO;
+    private NavigationOptions options = NavigationOptions.GROUND;
+    private NavigationSnapshot.Builder capture;
     private Vec3 lastPosition = Vec3.ZERO;
     private double tolerance = .75;
     private List<AStarPathFinder.Step> steps = List.of();
@@ -42,7 +46,8 @@ public final class NpcNavigation {
     private boolean jumping;
     private Vec3 pendingJumpVelocity;
     private long horizontalLaunchTick;
-    private long requestedNanos, queueNanos, searchNanos;
+    private volatile long requestedNanos, queueNanos, searchNanos;
+    private long snapshotNanos, coalescedRequests;
     private long requests, failedRequests;
 
     public NpcNavigation(CustomNpc npc) { this.npc = npc; }
@@ -53,6 +58,8 @@ public final class NpcNavigation {
     public long searchNanos() { return searchNanos; }
     public long requests() { return requests; }
     public long failedRequests() { return failedRequests; }
+    public long coalescedRequests() { return coalescedRequests; }
+    public long snapshotNanos() { return snapshotNanos; }
     public static int pendingCount() { return PENDING.size() + SEARCH.getQueue().size(); }
 
     /**
@@ -64,17 +71,32 @@ public final class NpcNavigation {
      * @return 参数有效且队列接受请求时返回 <code>true</code>
      */
     public boolean request(Vec3 target, double movementSpeed, double arrivalTolerance) {
+        return request(target, movementSpeed, arrivalTolerance, NavigationOptions.GROUND);
+    }
+
+    public boolean request(Vec3 target, double movementSpeed, double arrivalTolerance, NavigationOptions capabilities) {
         requests++;
         if (!(npc.level() instanceof ServerLevel) || !npc.isAlive() || !npc.getNpcAI().isEnabled()
                 || !Double.isFinite(target.lengthSqr()) || target.distanceToSqr(npc.position()) > 48 * 48
                 || !Double.isFinite(movementSpeed) || movementSpeed <= 0
-                || !Double.isFinite(arrivalTolerance) || arrivalTolerance <= 0) { failedRequests++; return false; }
-        cancel();
+                || !Double.isFinite(arrivalTolerance) || arrivalTolerance <= 0 || capabilities == null) { failedRequests++; return false; }
+        double acceptedTolerance = Math.max(.55, arrivalTolerance);
+        if ((status == NavigationStatus.COMPUTING || status == NavigationStatus.MOVING) && goal.equals(target)
+                && tolerance == acceptedTolerance && options.equals(capabilities)
+                && npc.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED).getBaseValue() == movementSpeed) {
+            coalescedRequests++; return true;
+        }
+        boolean queued = PENDING.contains(this);
+        if (queued) {
+            // 尚未提交搜索的请求原位更新，避免移动目标反复排到队尾。
+            generation++; result.set(null); capture = null; steps = List.of(); stopControls(); coalescedRequests++;
+        } else cancel();
         goal = target;
+        options = capabilities;
         npc.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED).setBaseValue(movementSpeed);
-        tolerance = Math.max(.55, arrivalTolerance);
+        tolerance = acceptedTolerance;
         replans = 0;
-        enqueue();
+        if (!queued) enqueue();
         return status == NavigationStatus.COMPUTING;
     }
 
@@ -83,6 +105,7 @@ public final class NpcNavigation {
         status = NavigationStatus.COMPUTING;
         reason = "";
         result.set(null);
+        capture = null; snapshotNanos = 0;
         requestedNanos = System.nanoTime();
         PENDING.remove(this);
         PENDING.addLast(this);
@@ -90,32 +113,46 @@ public final class NpcNavigation {
 
     @SubscribeEvent
     public static void schedule(ServerTickEvent.Post event) {
-        // 每 tick 最多一次世界快照，防止 50 个 NPC 同帧扫描地形。
-        NpcNavigation navigation = PENDING.pollFirst();
-        if (navigation == null) return;
-        if (navigation.npc.isRemoved() || navigation.npc.level().getServer() != event.getServer()
-                || navigation.status != NavigationStatus.COMPUTING) { navigation.cancel(); return; }
-        long request = navigation.generation, epoch = serverEpoch;
-        navigation.queueNanos = System.nanoTime() - navigation.requestedNanos;
-        try {
-            NavigationSnapshot snapshot = new NavigationSnapshot(navigation.npc, navigation.goal);
-            Vec3 start = navigation.npc.position(), target = navigation.goal;
-            double tolerance = navigation.tolerance;
-            SEARCH.execute(new SearchJob(navigation, () -> {
-                AStarPathFinder.Result calculated;
-                try {
-                    calculated = AStarPathFinder.calculate(snapshot, start, target, tolerance,
-                            () -> navigation.generation != request || epoch != serverEpoch);
-                } catch (RuntimeException exception) {
-                    ViScriptNpc.LOGGER.error("NPC navigation calculation failed", exception);
-                    calculated = new AStarPathFinder.Result(List.of(), "search_error", 0, 0);
-                }
-                if (navigation.generation == request && epoch == serverEpoch) navigation.result.accumulateAndGet(new Completed(request, calculated), (old, next) ->
-                        navigation.generation == request && (old == null || old.generation <= request) ? next : old);
-            }));
-        } catch (RuntimeException exception) {
-            navigation.fail("queue_full");
-            ViScriptNpc.LOGGER.warn("NPC navigation request rejected", exception);
+        lastDispatchCount = 0;
+        // 按时间预算分片生成，多份小快照同 tick 提交；重叠区域只读取一次地形。
+        long deadline = System.nanoTime() + 4_000_000L;
+        var terrain = new java.util.IdentityHashMap<ServerLevel, NavigationTerrain>();
+        for (int submitted = 0; submitted < 8 && !PENDING.isEmpty() && System.nanoTime() < deadline;) {
+            if (SEARCH.getQueue().remainingCapacity() == 0) break;
+            NpcNavigation navigation = PENDING.peekFirst();
+            if (navigation.npc.isRemoved() || navigation.npc.level().getServer() != event.getServer()
+                    || navigation.status != NavigationStatus.COMPUTING) { navigation.cancel(); continue; }
+            long request = navigation.generation, epoch = serverEpoch;
+            try {
+                long began = System.nanoTime();
+                if (navigation.capture == null) navigation.capture = new NavigationSnapshot.Builder(navigation.npc, navigation.goal, navigation.options);
+                boolean complete = navigation.capture.advance(terrain.computeIfAbsent((ServerLevel) navigation.npc.level(), NavigationTerrain::new), deadline);
+                navigation.snapshotNanos += System.nanoTime() - began;
+                if (!complete) break;
+                NavigationSnapshot snapshot = navigation.capture.finish(); navigation.capture = null;
+                PENDING.removeFirst(); submitted++; lastDispatchCount++;
+                Vec3 start = navigation.npc.position(), target = navigation.goal;
+                double tolerance = navigation.tolerance;
+                long requested = navigation.requestedNanos;
+                SEARCH.execute(new SearchJob(navigation, () -> {
+                    if (navigation.generation == request) navigation.queueNanos = System.nanoTime() - requested;
+                    AStarPathFinder.Result calculated;
+                    try {
+                        calculated = AStarPathFinder.calculate(snapshot, start, target, tolerance,
+                                () -> navigation.generation != request || epoch != serverEpoch);
+                    } catch (RuntimeException exception) {
+                        ViScriptNpc.LOGGER.error("NPC navigation calculation failed", exception);
+                        calculated = new AStarPathFinder.Result(List.of(), "search_error", 0, 0);
+                    }
+                    if (!calculated.reason().isEmpty() && !calculated.reason().equals("cancelled"))
+                        ViScriptNpc.LOGGER.debug("NPC navigation search: {} after {} nodes, {} ms", calculated.reason(), calculated.expanded(), calculated.nanos() / 1_000_000d);
+                    if (navigation.generation == request && epoch == serverEpoch) navigation.result.accumulateAndGet(new Completed(request, calculated), (old, next) ->
+                            navigation.generation == request && (old == null || old.generation <= request) ? next : old);
+                }));
+            } catch (RuntimeException exception) {
+                navigation.fail("snapshot_error");
+                ViScriptNpc.LOGGER.warn("NPC navigation request rejected", exception);
+            }
         }
     }
 
@@ -166,6 +203,7 @@ public final class NpcNavigation {
         }
         var step = steps.get(index);
         Vec3 point = step.position();
+        boolean medium = step.movement() == AStarPathFinder.Movement.SWIM || step.movement() == AStarPathFinder.Movement.CLIMB;
         boolean preciseTakeoff = step.movement() == AStarPathFinder.Movement.WALK && index + 1 < steps.size()
                 && steps.get(index + 1).movement() == AStarPathFinder.Movement.JUMP;
         double horizontalDistance = npc.position().subtract(point).horizontalDistance();
@@ -173,7 +211,7 @@ public final class NpcNavigation {
                 && ((index + 2 < steps.size() && steps.get(index + 2).movement() == AStarPathFinder.Movement.JUMP)
                 || (index > 0 && steps.get(index - 1).movement() == AStarPathFinder.Movement.JUMP)));
         boolean preciseGround = nearJump && npc.onGround() && horizontalDistance < 1.25 && Math.abs(npc.getY() - point.y) < .1;
-        if (Math.abs(npc.getY() - point.y) < .6 && horizontalDistance < (preciseTakeoff ? .01 : .3)) {
+        if (Math.abs(npc.getY() - point.y) < (medium ? .15 : .6) && horizontalDistance < (preciseTakeoff ? .01 : medium ? .22 : .3)) {
             if (preciseTakeoff || preciseGround) stopControls();
             index++;
             stuckTicks = 0;
@@ -182,7 +220,21 @@ public final class NpcNavigation {
         if (npc.position().distanceToSqr(lastPosition) < .0004) stuckTicks++; else stuckTicks = 0;
         lastPosition = npc.position();
         if (stuckTicks > 30) { replan(); return; }
+        openDoors(point);
         if (!clearLoaded(point)) { replan(); return; }
+        if (!medium && step.movement() != AStarPathFinder.Movement.JUMP && !canStandAt(point)) { replan(); return; }
+        if (medium) {
+            npc.setMoveControlForAi(new MoveControl(npc)); npc.setSpeed(0); npc.setZza(0); npc.setXxa(0);
+            Vec3 delta = point.subtract(npc.position());
+            double speed = Math.min(.15, npc.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED) * .4);
+            Vec3 horizontal = delta.multiply(1, 0, 1).normalize().scale(Math.min(speed, delta.horizontalDistance() * .5));
+            double vertical = npc.isInWater() ? Math.clamp(delta.y * .4, -.12, .12) + .005
+                    : step.movement() == AStarPathFinder.Movement.SWIM && npc.horizontalCollision && delta.y > 0
+                    ? Math.clamp(delta.y * .5 + .08, .08, .18)
+                    : npc.onClimbable() ? Math.clamp(delta.y * .5, -.12, .18) : npc.getDeltaMovement().y;
+            npc.setDeltaMovement(horizontal.x, vertical, horizontal.z); npc.hasImpulse = true;
+            return;
+        }
         if (step.movement() == AStarPathFinder.Movement.JUMP && npc.onGround()) {
             if (!jump(point)) replan();
             return;
@@ -231,7 +283,40 @@ public final class NpcNavigation {
         for (int x = (int) Math.floor(box.minX) >> 4; x <= (int) Math.floor(box.maxX) >> 4; x++)
             for (int z = (int) Math.floor(box.minZ) >> 4; z <= (int) Math.floor(box.maxZ) >> 4; z++)
                 if (level.getChunkSource().getChunkNow(x, z) == null) return false;
+        for (var pos : net.minecraft.core.BlockPos.betweenClosed(net.minecraft.core.BlockPos.containing(box.minX, box.minY, box.minZ),
+                net.minecraft.core.BlockPos.containing(box.maxX, box.maxY, box.maxZ))) {
+            var state = level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4).getBlockState(pos);
+            if (NavigationTerrain.isHazard(state) || !options.swim() && !state.getFluidState().isEmpty()
+                    || !options.climb() && state.is(net.minecraft.tags.BlockTags.CLIMBABLE)) return false;
+        }
         return level.getWorldBorder().isWithinBounds(box) && level.noCollision(npc, box);
+    }
+
+    /** 供巡逻和撤退挑选安全落点，先检查整个碰撞箱的区块加载状态。 */
+    public boolean canStandAt(Vec3 feet) {
+        if (!(npc.level() instanceof ServerLevel level) || !clearLoaded(feet)) return false;
+        var box = npc.getBoundingBox().move(feet.subtract(npc.position())).deflate(.001);
+        var support = new net.minecraft.world.phys.AABB(box.minX, feet.y - .06, box.minZ, box.maxX, feet.y, box.maxZ);
+        for (var pos : net.minecraft.core.BlockPos.betweenClosed(net.minecraft.core.BlockPos.containing(support.minX, support.minY, support.minZ),
+                net.minecraft.core.BlockPos.containing(support.maxX, support.minY, support.maxZ))) {
+            var state = level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4).getBlockState(pos);
+            if (NavigationTerrain.isHazard(state) || !state.getFluidState().isEmpty() || state.is(net.minecraft.tags.BlockTags.CLIMBABLE)) return false;
+        }
+        return level.getBlockCollisions(npc, support).iterator().hasNext();
+    }
+
+    private void openDoors(Vec3 point) {
+        if (!options.openDoors() || point.distanceToSqr(npc.position()) > 6.25) return;
+        var level = (ServerLevel) npc.level();
+        var box = npc.getBoundingBox().move(point.subtract(npc.position())).inflate(.05);
+        for (var pos : net.minecraft.core.BlockPos.betweenClosed(net.minecraft.core.BlockPos.containing(box.minX, box.minY, box.minZ),
+                net.minecraft.core.BlockPos.containing(box.maxX, box.maxY, box.maxZ))) {
+            var chunk = level.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
+            if (chunk == null) continue;
+            var state = chunk.getBlockState(pos);
+            if (state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock door && door.type().canOpenByHand()
+                    && !state.getValue(net.minecraft.world.level.block.DoorBlock.OPEN)) door.setOpen(npc, level, state, pos, true);
+        }
     }
 
     private void replan() {
@@ -245,6 +330,7 @@ public final class NpcNavigation {
         generation++;
         SEARCH.getQueue().removeIf(job -> job instanceof SearchJob search && search.owner == this);
         PENDING.remove(this);
+        capture = null;
         stopControls();
         this.reason = reason;
         status = NavigationStatus.FAILED;
@@ -254,6 +340,7 @@ public final class NpcNavigation {
         generation++;
         SEARCH.getQueue().removeIf(job -> job instanceof SearchJob search && search.owner == this);
         PENDING.remove(this);
+        capture = null;
         result.set(null);
         steps = List.of();
         jumping = false;

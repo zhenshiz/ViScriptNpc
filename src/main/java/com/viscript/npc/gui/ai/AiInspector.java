@@ -197,7 +197,7 @@ public final class AiInspector {
                         node.data.inputs.keySet().removeIf(key -> key.startsWith("param:"));
                     node.data.inputs.put(field.id(), AiBinding.literal(value));
                 });
-                if (field.id().equals("scope") || field.id().equals("file") || field.id().equals("filter") || field.id().equals("perception") || field.id().equals("property")) refresh(view, node);
+                if (Set.of("scope", "file", "filter", "perception", "property", "vector_operator").contains(field.id())) refresh(view, node);
             };
             var editor = valueEditor(field.id(), binding.value.copy(), field.choices(), update, view.actionResolver);
             editor.setActive(!inherited && wired == null);
@@ -245,9 +245,14 @@ public final class AiInspector {
                 yield position;
             }
             default -> {
-                if (!options.isEmpty()) yield new SelectorConfigurator<>("", () -> value.text,
-                        v -> { value.text = v; update.accept(value.copy()); }, value.text, false, options,
-                        v -> Component.translatable("viscript_npc.ai.choice." + v).getString());
+                if (!options.isEmpty()) {
+                    var selector = new SelectorConfigurator<>("", () -> value.text,
+                            v -> { value.text = v; update.accept(value.copy()); }, value.text, false, options,
+                            v -> Component.translatable("viscript_npc.ai.choice." + v).getString());
+                    // 常用运算的七个选项直接展开，避免末项落在紧凑滚动视口之外。
+                    selector.selector.selectorStyle(style -> style.maxItemCount(8));
+                    yield selector;
+                }
                 var resourceSearch = resourceSearch(value.type.equals("mob_type") ? "entity_type" : id, value.text);
                 if (resourceSearch != null) yield resourceEditor(id, value, update, resourceSearch);
                 if (id.equals("file")) {

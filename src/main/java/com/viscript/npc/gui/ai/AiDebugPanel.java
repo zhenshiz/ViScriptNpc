@@ -33,6 +33,8 @@ public final class AiDebugPanel {
                 String status = data.status.isBlank() ? "disconnected" : data.status;
                 inlineContainer.addChild(text(Component.translatable("viscript_npc.ai.debug.summary", data.entityId,
                         Component.translatable("viscript_npc.ai.debug." + status), data.tick)));
+                if (data.hasHome) inlineContainer.addChild(text(Component.translatable("viscript_npc.ai.debug.guard",
+                        Component.translatable("viscript_npc.ai.guard." + data.guardState), data.home.toString())));
                 if (data.paused && !data.currentNode.isBlank()) {
                     var next = new Button().setText(Component.translatable("viscript_npc.ai.debug.next_node",
                                     Component.translatable("viscript_npc.ai.node." + data.currentOperation)))

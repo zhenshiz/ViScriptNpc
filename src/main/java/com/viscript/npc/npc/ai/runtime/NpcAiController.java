@@ -9,6 +9,7 @@ import java.util.Map;
 /** 将 NPC 配置与独立行为定义绑定到单个服务器执行实例。 */
 public final class NpcAiController {
     private final CustomNpc npc;
+    public final NpcGuardState guard;
     private final Map<String, AiValue> blackboard = new LinkedHashMap<>();
     private AiExecution execution;
     private AiProgram configured;
@@ -33,7 +34,7 @@ public final class NpcAiController {
     }
     private String reason = "";
 
-    public NpcAiController(CustomNpc npc) { this.npc = npc; }
+    public NpcAiController(CustomNpc npc) { this.npc = npc; guard = new NpcGuardState(npc); }
 
     public void tick() {
         navigationStep = false;
@@ -139,12 +140,16 @@ public final class NpcAiController {
         if (execution != null) execution.cancel();
         execution = null;
         configured = null;
+        guard.reset();
         reason = "";
         npc.getNpcNavigation().cancel();
     }
     public AiDebugSnapshot snapshot() {
         AiDebugSnapshot data = new AiDebugSnapshot();
         data.entityId = npc.getId();
+        data.guardState = guard.state();
+        data.hasHome = guard.hasHome();
+        if (data.hasHome) data.home = guard.home();
         if (execution != null) {
             data.activeNodes.addAll(execution.activeNodes()); data.phase = execution.phase;
             data.perceptions.addAll(execution.perceptions());

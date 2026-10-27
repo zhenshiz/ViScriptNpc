@@ -256,8 +256,15 @@ public class CustomNpc extends PathfinderMob {
     }
 
     @Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        tag.put("viscript_npc:guard_home", aiController.guard.save());
+    }
+
+    @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
+        aiController.guard.load(tag.getCompound("viscript_npc:guard_home"));
         if (!tag.contains("neoforge:attachments")) NpcAttachmentType.getAttachmentClasses().forEach(clazz -> {
             try {
                 INpcData npcAttachment = clazz.getConstructor().newInstance();
@@ -502,6 +509,8 @@ public class CustomNpc extends PathfinderMob {
         @SubscribeEvent
         public static void hurt(LivingDamageEvent.Post event) {
             if (event.getEntity() instanceof CustomNpc npc) {
+                if (!npc.level().isClientSide() && event.getNewDamage() > 0 && event.getSource().getEntity() instanceof LivingEntity attacker)
+                    npc.getAiController().guard.damagedBy(attacker, event.getNewDamage());
                 //反弹伤害
                 float reboundDamage = npc.getNpcAttributes().getDefenseConfig().getReboundDamage();
                 if (reboundDamage > 0) {

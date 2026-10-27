@@ -8,6 +8,9 @@ public class AiDebugSnapshot implements IPersistedSerializable {
     @Persisted public int entityId;
     @Persisted public java.util.List<String> activeNodes = new java.util.ArrayList<>();
     @Persisted public String phase = "";
+    @Persisted public String guardState = "";
+    @Persisted public boolean hasHome;
+    @Persisted public net.minecraft.world.phys.Vec3 home = net.minecraft.world.phys.Vec3.ZERO;
     @Persisted public String status = "";
     @Persisted public String reason = "";
     @Persisted public String navigationStatus = "";

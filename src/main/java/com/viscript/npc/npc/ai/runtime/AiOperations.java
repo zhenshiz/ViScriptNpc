@@ -21,17 +21,25 @@ public final class AiOperations {
         add("reactive_sequence", "flow", 64);
         add("reactive_selector", "flow", 64);
         add("parallel", "flow", 64, choice("policy", "all_success", "any_success"));
+        add("weighted_selector", "flow", 64);
+        add("weight", "flow", 1, number("weight", 1));
         add("target_exists", "condition", 0);
         add("target_distance", "condition", 0, number("min_distance", 0), number("max_distance", 32));
         add("target_sight", "condition", 0);
         add("self_health", "condition", 0, number("max_health_ratio", .5));
         add("number_compare", "condition", 0, number("left", 0), choice("compare", "equal", "less", "greater"), number("right", 0));
+        add("chance", "condition", 0, number("probability", .5));
+        add("returning_home", "condition", 0);
+        add("home_distance", "condition", 0, number("min_distance", 0), number("max_distance", 32));
         var detectionFields = new java.util.ArrayList<>(List.of(perceptionFields(true)));
         detectionFields.replaceAll(field -> field.id().equals("filter")
                 ? new Field("filter", AiValue.choice("player", field.choices()), field.choices()) : field);
         add("detect_target", "condition", 0, detectionFields.toArray(Field[]::new));
         add("cooldown", "flow", 1, number("seconds", 2));
         add("sense_targets", "tree", 1, perceptionFields(true));
+        var guardFields = new java.util.ArrayList<>(List.of(perceptionFields(true)));
+        guardFields.addAll(List.of(number("leash_range", 24), number("memory_seconds", 3), number("home_range", .8), flag("retaliate", true)));
+        add("guard_area", "tree", 1, guardFields.toArray(Field[]::new));
         add("timeout", "flow", 1, number("seconds", 10));
         add("invert", "flow", 1);
         add("repeat", "flow", 1, number("count", 2));
@@ -48,7 +56,7 @@ public final class AiOperations {
         findFields.add(flag("set_current_target", true));
         findFields.add(text("output", ""));
         add("find_target", "action", 0, findFields.toArray(Field[]::new));
-        add("patrol", "action", 0, number("patrol_radius", 6), number("speed", .5), number("seconds", 20), number("pause_seconds", 1));
+        movement("patrol", number("patrol_radius", 6), number("speed", .5), number("seconds", 20), number("pause_seconds", 1));
         add("set_target", "action", 0, text("entity", ""), entity("recipient"));
         add("get_entity", "action", 0, entity("recipient"), text("output", ""));
         add("entity_info", "action", 0, entity("recipient"), choice("property", "health", "max_health", "health_ratio", "alive", "position", "entity_type"), text("output", ""));
@@ -56,9 +64,14 @@ public final class AiOperations {
         add("position", "action", 0, choice("origin", "target", "self", "fixed"),
                 new Field("position", AiValue.position(net.minecraft.world.phys.Vec3.ZERO)),
                 number("forward", 0), number("right", 0), number("up", 0), text("output", "landing"));
-        add("navigate", "action", 0, new Field("position", AiValue.position(net.minecraft.world.phys.Vec3.ZERO)),
+        movement("navigate", new Field("position", AiValue.position(net.minecraft.world.phys.Vec3.ZERO)),
                 number("speed", .5), number("range", .75), number("seconds", 30));
-        add("approach", "action", 0, number("speed", .5), number("range", 2), number("seconds", 30), entity("recipient"));
+        movement("approach", number("speed", .5), number("range", 2), number("seconds", 30), entity("recipient"));
+        movement("retreat", number("speed", .5), number("range", 6), number("seconds", 30), entity("recipient"));
+        movement("keep_distance", number("speed", .5), number("min_distance", 4), number("max_distance", 10), number("seconds", 30), entity("recipient"));
+        movement("return_home", number("speed", .5), number("range", .8), number("seconds", 30));
+        add("set_home", "action", 0, flag("use_current", true), new Field("position", AiValue.position(net.minecraft.world.phys.Vec3.ZERO)));
+        add("home_position", "action", 0, text("output", ""));
         add("stop", "action", 0);
         add("look", "action", 0, entity("recipient"));
         add("jump", "action", 0, new Field("position", AiValue.position(net.minecraft.world.phys.Vec3.ZERO)), number("range", 4));
@@ -71,6 +84,11 @@ public final class AiOperations {
         add("particle", "action", 0, text("particle", "minecraft:crit"), number("count", 12), number("spread", .5), entity("recipient"));
         add("sound", "action", 0, text("sound", "minecraft:entity.player.attack.strong"), number("volume", 1), number("pitch", 1), entity("recipient"));
         add("set_variable", "action", 0, choice("scope", "local", "blackboard"), text("variable", ""), number("value", 0));
+        add("number_math", "action", 0, number("left", 0), choice("operator", "add", "subtract", "multiply", "divide", "modulo", "minimum", "maximum"), number("right", 0), text("output", ""));
+        add("vector_math", "action", 0, new Field("vector_left", AiValue.position(net.minecraft.world.phys.Vec3.ZERO)),
+                choice("vector_operator", "add", "subtract", "scale", "normalize", "dot", "distance", "length"),
+                new Field("vector_right", AiValue.position(net.minecraft.world.phys.Vec3.ZERO)), number("factor", 1), text("output", ""));
+        add("random_number", "action", 0, number("minimum", 0), number("maximum", 1), flag("integer", false), text("output", ""));
         add("debug_log", "debug", 0, text("message", ""), number("value", 0));
         add("debug_line", "debug", 0, new Field("from", AiValue.position(net.minecraft.world.phys.Vec3.ZERO)),
                 new Field("to", AiValue.position(net.minecraft.world.phys.Vec3.ZERO)), number("seconds", 1));
@@ -83,7 +101,9 @@ public final class AiOperations {
     }
     public static boolean hasHitBranch(String type) { return List.of("melee", "ranged", "area_damage").contains(type); }
     public static String outputType(AiNodeData node) {
-        if (node.type.equals("position")) return "position";
+        if (node.type.equals("position") || node.type.equals("home_position")) return "position";
+        if (node.type.equals("number_math") || node.type.equals("random_number")) return "number";
+        if (node.type.equals("vector_math")) return List.of("dot", "distance", "length").contains(node.literal("vector_operator", AiValue.text("add")).text) ? "number" : "position";
         if (node.type.equals("entity_info")) return switch (node.literal("property", AiValue.text("health")).text) {
             case "alive" -> "boolean"; case "position" -> "position"; case "entity_type" -> "string"; default -> "number";
         };
@@ -98,7 +118,18 @@ public final class AiOperations {
         return type.equals("find_target") || isContinuousPerception(type);
     }
     public static boolean isContinuousPerception(String type) {
-        return type.equals("sense_targets") || type.equals("detect_target");
+        return type.equals("sense_targets") || type.equals("detect_target") || type.equals("guard_area");
+    }
+    public static boolean hasOutput(String type) {
+        return List.of("position", "find_target", "get_entity", "entity_info", "home_position", "number_math", "vector_math", "random_number").contains(type);
+    }
+    public static boolean isMovement(String type) {
+        return List.of("navigate", "approach", "retreat", "keep_distance", "return_home", "jump", "patrol").contains(type);
+    }
+    private static void movement(String id, Field... fields) {
+        var result = new java.util.ArrayList<>(List.of(fields));
+        result.addAll(List.of(flag("open_doors", false), flag("swim", false), flag("climb", false)));
+        add(id, "action", 0, result.toArray(Field[]::new));
     }
     private static Field entity(String key) { return new Field(key, AiValue.entity(new com.viscript.npc.npc.ai.data.AiEntityRef())); }
     private static Field number(String key, double value) { return new Field(key, AiValue.number(value)); }
@@ -110,7 +141,7 @@ public final class AiOperations {
     }
     public static Operation get(String id) { return OPERATIONS.get(id); }
     public static boolean hasDataInput(Field field) {
-        return !java.util.Set.of("file", "variable", "output", "scope", "property").contains(field.id());
+        return !java.util.Set.of("file", "variable", "output", "scope", "property", "vector_operator").contains(field.id());
     }
     /**
      * 判断选敌节点是否可能使用实体类型筛选；动态选敌模式在运行时决定是否生效。

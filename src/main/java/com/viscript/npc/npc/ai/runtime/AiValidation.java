@@ -94,10 +94,13 @@ public final class AiValidation {
         if (value == null || !validValue(value) || !value.type.equals(expected)) return "type";
         var choices = field.choices().isEmpty() ? AiValue.choices(expected) : field.choices();
         if (!choices.isEmpty() && !choices.contains(value.text)) return "choice";
+        if (expected.equals("number") && field.id().equals("probability") && (value.number < 0 || value.number > 1)) return "number";
+        if (expected.equals("number") && field.id().equals("leash_range") && (value.number < 1 || value.number > 48)) return "number";
+        if (expected.equals("number") && field.id().equals("home_range") && (value.number < .55 || value.number > 4)) return "number";
         if (expected.equals("number") && field.id().equals("max_health_ratio") && (value.number < 0 || value.number > 1)) return "number";
         if (expected.equals("number") && field.id().equals("view_angle") && (value.number < 0 || value.number > 360)) return "number";
         if (expected.equals("number") && field.id().equals("view_radius") && (value.number < 0 || value.number > 64)) return "number";
-        if (expected.equals("number") && Set.of("seconds", "range", "damage", "speed", "count", "knockback", "strength", "min_distance", "max_distance", "height", "patrol_radius", "pause_seconds").contains(field.id())
+        if (expected.equals("number") && Set.of("seconds", "range", "damage", "speed", "count", "knockback", "strength", "min_distance", "max_distance", "height", "patrol_radius", "pause_seconds", "memory_seconds", "weight").contains(field.id())
                 && (value.number < 0 || value.number > 72000)) return "number";
         return validResource(expected.equals("mob_type") ? "entity_type" : field.id(), value.text) ? null : "resource";
     }
@@ -159,13 +162,21 @@ public final class AiValidation {
             AiBinding value = node.inputs.get(field.id());
             if (value != null) binding(value, field, program, id, issues);
         }
-        if (Set.of("find_target", "get_entity", "entity_info").contains(node.type)) {
+        if (AiOperations.hasOutput(node.type) && !node.type.equals("position")) {
             String output = node.literal("output", AiValue.text("")).text;
             if (!output.isEmpty() && program.variables.stream().noneMatch(v -> v.id.equals(output) && v.initial.type.equals(AiOperations.outputType(node))))
                 issues.add(new Issue(id, "binding", "output"));
         }
         if (node.type.equals("entity_info") && node.inputs.containsKey("property") && !node.inputs.get("property").scope.equals("literal"))
             issues.add(new Issue(id, "binding", "property"));
+        if (node.type.equals("vector_math") && node.inputs.containsKey("vector_operator") && !node.inputs.get("vector_operator").scope.equals("literal"))
+            issues.add(new Issue(id, "binding", "vector_operator"));
+        if (node.type.equals("random_number")) {
+            var min = node.inputs.get("minimum"); var max = node.inputs.get("maximum");
+            if ((min == null || min.scope.equals("literal")) && (max == null || max.scope.equals("literal"))
+                    && node.literal("minimum", AiValue.number(0)).number > node.literal("maximum", AiValue.number(1)).number)
+                issues.add(new Issue(id, "random_range", "minimum > maximum"));
+        }
         if (!node.onHit.isEmpty() && !AiOperations.hasHitBranch(node.type)) issues.add(new Issue(id, "children", "on_hit"));
         if (node.type.equals("position") || node.type.equals("set_variable")) {
             String field = node.type.equals("position") ? "output" : "variable";

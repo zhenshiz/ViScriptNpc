@@ -88,6 +88,7 @@ public final class AiEditorView extends GraphEditorView {
     }
 
     private static AiGraphView openAction(NpcEditor editor, String id) {
+        if (NpcActionFiles.isBuiltin(id)) return openExample(editor, id);
         try {
             var path = NpcEditorFiles.resolveProjectFile(NpcActionProject.FORMAT, id, true);
             if (editor.getWindow() != null) for (var tab : editor.getWindow().getEditors().keySet()) {
@@ -118,11 +119,13 @@ public final class AiEditorView extends GraphEditorView {
         return editor.select("#npc_ai_graph_action").filter(AiGraphView.class::isInstance)
                 .map(AiGraphView.class::cast).findFirst().orElse(null);
     }
-    private static void openExample(NpcEditor editor, String id) {
-        if (editor.getWindow() == null || !NpcActionFiles.isBuiltin(id)) return;
+    private static AiGraphView openExample(NpcEditor editor, String id) {
+        if (editor.getWindow() == null || !NpcActionFiles.isBuiltin(id)) return null;
         var project = new NpcActionProject();
         project.program = com.viscript.npc.npc.ai.runtime.AiExamples.action(id.substring(9)).copy(Platform.getFrozenRegistry());
-        editor.getWindow().createNewEditor(NpcEditor::new).loadProject(project, null);
+        var created = editor.getWindow().createNewEditor(NpcEditor::new);
+        created.loadProject(project, null);
+        return actionView(created);
     }
 
 }

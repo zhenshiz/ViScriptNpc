@@ -7,3 +7,7 @@ movement candidates and server execution are adapted for ViScriptNpc.
 Client contexts, player input, breaking, placing, caches and native code are excluded.
 Modified source is distributed with ViScriptNpc under the same LGPL terms.
 Rebuild this project to replace or modify the adapted implementation.
+
+Additional ViScriptNpc adaptations: budgeted incremental snapshot capture,
+per-search occupancy memoization, vertical heuristics, and optional door,
+swimming and climbing movements. Search work has CPU and wall-clock limits.

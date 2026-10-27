@@ -46,13 +46,21 @@ public final class AiPerception {
      * @return 合法的存活目标；没有符合条件的实体时返回 {@code null}
      */
     public static LivingEntity find(AiExecution execution, AiNodeData node, AiPerceptionVolume volume, boolean retainTarget) {
+        return find(execution, node, volume, retainTarget, entity -> true);
+    }
+
+    public static boolean canTarget(com.viscript.npc.npc.CustomNpc npc, LivingEntity candidate) {
+        return candidate != null && candidate != npc && candidate.isAlive() && candidate.level() == npc.level()
+                && candidate.isAttackable() && !(candidate instanceof Player player && (player.isCreative() || player.isSpectator()))
+                && NpcFactionBridge.canHurt(npc, candidate);
+    }
+
+    public static LivingEntity find(AiExecution execution, AiNodeData node, AiPerceptionVolume volume, boolean retainTarget,
+                                   java.util.function.Predicate<LivingEntity> extra) {
         var npc = execution.npc;
         String filter = execution.text(node, "filter");
         String entityType = filter.equals("living") ? execution.text(node, "entity_type") : "";
-        java.util.function.Predicate<LivingEntity> eligible = candidate -> candidate != npc && candidate.isAlive()
-                && candidate.level() == npc.level() && candidate.isAttackable()
-                && !(candidate instanceof Player player && (player.isCreative() || player.isSpectator()))
-                && NpcFactionBridge.canHurt(npc, candidate)
+        java.util.function.Predicate<LivingEntity> eligible = candidate -> canTarget(npc, candidate) && extra.test(candidate)
                 && (!filter.equals("living") || candidate instanceof Mob)
                 && (entityType.isEmpty() || BuiltInRegistries.ENTITY_TYPE.getKey(candidate.getType()).toString().equals(entityType))
                 && (!filter.equals("player") || candidate instanceof Player)

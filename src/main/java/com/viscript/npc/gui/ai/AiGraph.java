@@ -30,9 +30,6 @@ public final class AiGraph extends Graph {
                     && AiOperations.supports(kind, attribute.name().substring(prefix.length()));
         }).toList();
     }
-    @Override public List<Class<? extends Node>> getLibrarySupportNodes() {
-        return getSupportNodes();
-    }
     @Override public List<TypeHandle> getSupportTypes() { return AiVariables.TYPES; }
     @Override public List<TypeHandle> getLibrarySupportTypes() { return AiVariables.TYPES; }
     @Override public java.util.Set<com.lowdragmc.lowdraglib2.nodegraphtookit.api.variable.VariableKind> getSupportedSubgraphVariableKinds() {

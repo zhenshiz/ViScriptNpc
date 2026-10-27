@@ -40,6 +40,7 @@ public final class AiExecution {
 
     /** @return 此执行实例首次运行时固定的巡逻中心。 */
     public net.minecraft.world.phys.Vec3 patrolOrigin() {
+        if (npc.getAiController().guard.hasHome()) return npc.getAiController().guard.home();
         if (patrolOrigin == null) patrolOrigin = npc.position();
         return patrolOrigin;
     }
@@ -133,6 +134,7 @@ public final class AiExecution {
 
     public void cancel() {
         cancelVersion++;
+        if (program.kind.equals("tree")) npc.getAiController().guard.reset();
         if (root != null) root.cancel();
         if (navigation.owner != null) {
             for (AiExecution owner = navigation.owner.execution(); owner != null; owner = owner.caller) {
@@ -240,6 +242,11 @@ public final class AiExecution {
                     && npc.distanceTo(target) <= number(node, "max_distance");
             case "target_sight" -> valid && npc.hasLineOfSight(target);
             case "self_health" -> npc.getHealth() / npc.getMaxHealth() <= number(node, "max_health_ratio");
+            case "returning_home" -> npc.getAiController().guard.returning();
+            case "home_distance" -> npc.getAiController().guard.hasHome()
+                    && npc.position().distanceTo(npc.getAiController().guard.home()) >= number(node, "min_distance")
+                    && npc.position().distanceTo(npc.getAiController().guard.home()) <= number(node, "max_distance");
+            case "chance" -> npc.getRandom().nextDouble() < number(node, "probability");
             case "number_compare" -> switch (text(node, "compare")) {
                 case "equal" -> number(node, "left") == number(node, "right");
                 case "less" -> number(node, "left") < number(node, "right");
@@ -405,10 +412,31 @@ public final class AiExecution {
                     }
                     return child(0);
                 }
+                case "guard_area":
+                    if (entering) npc.getAiController().guard.update(AiExecution.this, node);
+                    return child(0);
                 case "detect_target":
                     return detectTarget(node) == null ? AiStatus.FAILURE : AiStatus.SUCCESS;
-                case "target_exists", "target_distance", "target_sight", "self_health", "number_compare":
+                case "target_exists", "target_distance", "target_sight", "self_health", "number_compare", "returning_home", "home_distance", "chance":
                     return testCondition(node, npc.getTarget()) ? AiStatus.SUCCESS : AiStatus.FAILURE;
+                case "weight": return child(0);
+                case "weighted_selector": {
+                    if (!started) {
+                        double total = 0;
+                        double[] weights = new double[node.children.size()];
+                        for (int i = 0; i < weights.length; i++) {
+                            var candidate = nodes.get(node.children.get(i));
+                            weights[i] = candidate != null && candidate.type.equals("weight") ? number(candidate, "weight") : 1;
+                            total += weights[i];
+                        }
+                        if (total <= 0) { reason = "zero_weights"; return AiStatus.FAILURE; }
+                        double pick = npc.getRandom().nextDouble() * total;
+                        cursor = weights.length - 1;
+                        for (int i = 0; i < weights.length; i++) if ((pick -= weights[i]) < 0) { cursor = i; break; }
+                        started = true;
+                    }
+                    return child(cursor);
+                }
                 case "cooldown": {
                     if (child == null && cooldowns.getOrDefault(node.id, 0L) > time()) return AiStatus.FAILURE;
                     AiStatus status = child(0);

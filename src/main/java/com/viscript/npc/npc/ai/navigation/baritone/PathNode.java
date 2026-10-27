@@ -20,7 +20,7 @@ public final class PathNode {
         this.y = y;
         this.z = z;
         estimatedCostToGoal = Math.hypot(x + .5 - goal.x, z + .5 - goal.z)
-                * ActionCosts.SPRINT_ONE_BLOCK_COST;
+                * ActionCosts.SPRINT_ONE_BLOCK_COST + Math.abs(y * .5 - goal.y) * 2;
     }
 
     public boolean isOpen() { return heapPosition != -1; }

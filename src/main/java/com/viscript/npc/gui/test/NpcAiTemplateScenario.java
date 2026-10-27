@@ -44,8 +44,7 @@ public final class NpcAiTemplateScenario implements UIScenario {
                 }).click("#npc_ai_examples").awaitElement("#npc_ai_example_melee")
                 .check("官方目录只保留复合方案按钮", c -> AiExamples.NAMES.stream().allMatch(name ->
                         c.count("#npc_ai_example_" + name) == 1)
-                        && c.count("#npc_ai_example_idle") == 0 && c.count("#npc_ai_example_acquire") == 0
-                        && c.count("#npc_ai_example_approach") == 0)
+                        && c.count("#npc_ai_example_idle") == 0 && c.count("#npc_ai_example_acquire") == 0)
                 .screenshot("builtin_compound_examples");
         for (String name : AiExamples.NAMES) {
             s.step("复制示例到编辑标签 " + name, c -> activate(c, "#npc_ai_example_" + name)).awaitElement("#npc_ai_graph_action")
